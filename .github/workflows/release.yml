@@ -13,7 +13,7 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cek versi
         id: ver
@@ -23,29 +23,46 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          if gh release view "v$V" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            echo "Rilis v$V sudah ada — tidak ada yang dibuat."
+          # Rilis dianggap lengkap bila latest.yml (dipakai update otomatis) sudah ada.
+          if gh release view "v$V" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx 'latest.yml'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Rilis v$V sudah lengkap — tidak ada yang dibuat."
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-node@v4
-        if: steps.ver.outputs.exists == 'false'
+      - uses: actions/setup-node@v5
+        if: steps.ver.outputs.skip == 'false'
         with:
           node-version: 22
           cache: npm
 
       - name: Pasang dependensi
-        if: steps.ver.outputs.exists == 'false'
+        if: steps.ver.outputs.skip == 'false'
         run: npm ci
 
       - name: Uji
-        if: steps.ver.outputs.exists == 'false'
+        if: steps.ver.outputs.skip == 'false'
         run: npm test
 
-      - name: Build & terbitkan installer
-        if: steps.ver.outputs.exists == 'false'
+      - name: Build installer
+        if: steps.ver.outputs.skip == 'false'
+        run: npx electron-builder --win nsis --x64 --publish never
+
+      # Unggah sendiri lewat gh (electron-builder kadang membuat rilis dua kali bersamaan → gagal 422).
+      - name: Terbitkan rilis
+        if: steps.ver.outputs.skip == 'false'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win nsis --x64 --publish always
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          cd dist
+          FILES=("BacaLayar-Setup-$V.exe" "BacaLayar-Setup-$V.exe.blockmap" "latest.yml")
+          ls -la "${FILES[@]}"
+          if gh release view "v$V" >/dev/null 2>&1; then
+            gh release upload "v$V" "${FILES[@]}" --clobber
+          else
+            gh release create "v$V" "${FILES[@]}" --target "$GITHUB_SHA" --title "Baca Layar $V" \
+              --notes "Unduh **BacaLayar-Setup-$V.exe** di bawah lalu jalankan. Bila muncul SmartScreen: *Info selengkapnya → Tetap jalankan*. Aplikasi yang sudah terpasang akan memperbarui diri otomatis."
+          fi
