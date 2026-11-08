@@ -14,6 +14,7 @@ const {
   session,
   clipboard,
   Notification,
+  WebContentsView,
 } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -51,6 +52,8 @@ const DEFAULTS = {
   closeToTray: true,
   trayHintShown: false,
   openAtLogin: false,
+  pageUrl: 'https://pustaka.ut.ac.id/',
+  pageBounds: null,
 };
 let settings = { ...DEFAULTS };
 const settingsFile = () => path.join(app.getPath('userData'), 'pengaturan.json');
@@ -126,6 +129,246 @@ function createMainWindow() {
 
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
+
+// ---------------- Halaman di dalam aplikasi ----------------
+// Jendela "Halaman": bilah alat (renderer/page.html) di atas + halaman web (WebContentsView) di bawah.
+// Area baca jenis 'page' ditangkap langsung dari halaman (tanpa screenshot layar, tanpa gerak mouse).
+const PAGE_BAR = 86; // tinggi bilah alat (DIP)
+let pageWin = null;
+let pageView = null;
+
+function sendPage(channel, payload) {
+  if (pageWin && !pageWin.isDestroyed()) pageWin.webContents.send(channel, payload);
+}
+
+function pageAlive() {
+  return !!(pageWin && !pageWin.isDestroyed() && pageView && !pageView.webContents.isDestroyed());
+}
+
+function layoutPage() {
+  if (!pageAlive()) return;
+  const [w, h] = pageWin.getContentSize();
+  pageView.setBounds({ x: 0, y: PAGE_BAR, width: w, height: Math.max(0, h - PAGE_BAR) });
+}
+
+function pageState() {
+  if (!pageAlive()) return { open: false };
+  const wc = pageView.webContents;
+  return {
+    open: true,
+    url: wc.getURL(),
+    title: wc.getTitle(),
+    loading: wc.isLoading(),
+    canGoBack: wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack(),
+    canGoForward: wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward(),
+    regionKind: lastRegion ? lastRegion.kind || 'screen' : null,
+    state: uiState,
+  };
+}
+const pushPageState = () => sendPage('page:state', pageState());
+
+function normalizeUrl(input) {
+  let u = String(input || '').trim();
+  if (!u) return null;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) {
+    // "pustaka.ut.ac.id" → https://…; kata biasa → cari di Google
+    u = /^[\w-]+(\.[\w-]+)+(\/|$|:\d)/.test(u) || /^localhost/.test(u) ? 'https://' + u : 'https://www.google.com/search?q=' + encodeURIComponent(u);
+  }
+  if (!/^(https?|file):/i.test(u)) return null;
+  return u;
+}
+
+function openPage(url) {
+  const target = normalizeUrl(url) || normalizeUrl(settings.pageUrl) || DEFAULTS.pageUrl;
+  if (pageAlive()) {
+    if (url) pageView.webContents.loadURL(target).catch(() => {});
+    if (pageWin.isMinimized()) pageWin.restore();
+    pageWin.show();
+    pageWin.focus();
+    return pageState();
+  }
+  const b = settings.pageBounds || {};
+  pageWin = new BrowserWindow({
+    width: b.width || 1120,
+    height: b.height || 820,
+    x: b.x,
+    y: b.y,
+    minWidth: 720,
+    minHeight: 480,
+    title: 'Halaman — Baca Layar',
+    icon: path.join(ASSETS, 'icon.png'),
+    backgroundColor: '#14171f',
+    autoHideMenuBar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+      spellcheck: false,
+    },
+  });
+  pageWin.removeMenu();
+  pageWin.loadFile(path.join(__dirname, 'renderer', 'page.html'));
+
+  pageView = new WebContentsView({
+    webPreferences: {
+      partition: 'persist:halaman', // login situs (mis. UT) tersimpan
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  pageWin.contentView.addChildView(pageView);
+  layoutPage();
+  const wc = pageView.webContents;
+  wc.setWindowOpenHandler(({ url: u }) => {
+    if (/^https?:/i.test(u)) wc.loadURL(u).catch(() => {});
+    return { action: 'deny' };
+  });
+  for (const ev of ['did-start-loading', 'did-stop-loading', 'did-navigate', 'did-navigate-in-page', 'page-title-updated', 'did-fail-load']) {
+    wc.on(ev, () => pushPageState());
+  }
+  wc.on('did-navigate', (e, u) => {
+    if (/^https?:/i.test(u)) {
+      settings.pageUrl = u;
+      saveSettings();
+    }
+  });
+  wc.on('did-fail-load', (e, code, desc, u, isMain) => {
+    if (isMain && code !== -3) sendPage('page:error', `Tidak bisa membuka ${u}: ${desc}`);
+  });
+  wc.on('before-input-event', (e, input) => {
+    // F5 / Alt+Panah / Ctrl+L di halaman tetap berguna
+    if (input.type !== 'keyDown') return;
+    if (input.key === 'F5') wc.reload();
+    else if (input.alt && input.key === 'ArrowLeft' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
+    else if (input.alt && input.key === 'ArrowRight' && wc.navigationHistory.canGoForward()) wc.navigationHistory.goForward();
+    else if (input.control && input.key.toLowerCase() === 'l') sendPage('page:focusUrl');
+    else return;
+    e.preventDefault();
+  });
+  wc.session.setPermissionRequestHandler((_wc, permission, cb) => cb(['fullscreen', 'clipboard-sanitized-write'].includes(permission)));
+  wc.loadURL(target).catch(() => {});
+
+  pageWin.on('resize', layoutPage);
+  const saveBounds = () => {
+    if (!pageWin || pageWin.isDestroyed() || pageWin.isMinimized() || pageWin.isMaximized()) return;
+    settings.pageBounds = pageWin.getBounds();
+  };
+  pageWin.on('resize', saveBounds);
+  pageWin.on('move', saveBounds);
+  pageWin.once('ready-to-show', () => {
+    pageWin.show();
+    pushPageState();
+  });
+  pageWin.webContents.on('did-finish-load', pushPageState);
+  pageWin.on('closed', () => {
+    saveSettings();
+    pageWin = null;
+    if (pageView && !pageView.webContents.isDestroyed()) pageView.webContents.close();
+    pageView = null;
+    if (lastRegion && lastRegion.kind === 'page') {
+      lastRegion = null;
+      prevContinuousLines = null;
+      send('region:changed', null);
+    }
+  });
+  return { open: true, url: target };
+}
+
+/** Titik tengah halaman (koordinat relatif view, DIP) — untuk roda mouse buatan. */
+function pageCenter() {
+  const r = lastRegion && lastRegion.kind === 'page' && lastRegion.rect;
+  const b = pageView.getBounds();
+  if (r) return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+  return { x: Math.round(b.width / 2), y: Math.round(b.height / 2) };
+}
+
+/** Gulir halaman di dalam aplikasi dengan roda mouse buatan (tanpa menggerakkan mouse asli). */
+async function scrollPage(notches) {
+  if (!pageAlive()) return { error: 'Jendela Halaman sudah ditutup.' };
+  const n = Math.max(1, Math.min(40, Math.abs(Math.round(notches)) || 1));
+  const dir = notches < 0 ? 1 : -1; // deltaY negatif = ke bawah
+  const { x, y } = pageCenter();
+  const wc = pageView.webContents;
+  for (let i = 0; i < n; i++) {
+    wc.sendInputEvent({ type: 'mouseWheel', x, y, deltaX: 0, deltaY: dir * 100, wheelTicksX: 0, wheelTicksY: dir, canScroll: true });
+    await sleep(25);
+  }
+  return { ok: true, via: 'page' };
+}
+
+/** Tangkap gambar area baca pada halaman di dalam aplikasi. */
+async function capturePageRegion(rect) {
+  if (!pageAlive()) throw new Error('Jendela Halaman sudah ditutup.');
+  if (pageWin.isMinimized()) {
+    pageWin.restore();
+    await sleep(300);
+  }
+  const img = await pageView.webContents.capturePage(rect || undefined);
+  if (img.isEmpty()) throw new Error('Halaman tidak bisa ditangkap (jendela tertutup/minimized?).');
+  return img;
+}
+
+/** Pilih area di dalam halaman: overlay seukuran view di atas jendela Halaman. */
+async function selectPageArea() {
+  if (ocrBusy || overlayWin) return { error: 'Masih memproses, tunggu sebentar.', busy: true };
+  if (!pageAlive()) return { error: 'Jendela Halaman sudah ditutup.' };
+  ocrBusy = true;
+  try {
+    const thumb = await capturePageRegion(null);
+    const cb = pageWin.getContentBounds();
+    const vb = pageView.getBounds();
+    const bounds = { x: cb.x + vb.x, y: cb.y + vb.y, width: vb.width, height: vb.height };
+    const rect = await pickArea({ bounds }, thumb);
+    if (!rect || rect.width < 6 || rect.height < 6) return { cancelled: true };
+    const r = { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+    lastRegion = { kind: 'page', rect: r };
+    prevContinuousLines = null;
+    send('region:changed', regionInfo());
+    pushPageState();
+    return { ok: true, rect: r };
+  } catch (e) {
+    return { error: e.message || String(e) };
+  } finally {
+    ocrBusy = false;
+  }
+}
+
+/** Jadikan seluruh tampilan halaman sebagai area baca. */
+function usePageRegion() {
+  if (!pageAlive()) return { error: 'Jendela Halaman sudah ditutup.' };
+  if (!(lastRegion && lastRegion.kind === 'page')) {
+    lastRegion = { kind: 'page', rect: null };
+    prevContinuousLines = null;
+    send('region:changed', regionInfo());
+    pushPageState();
+  }
+  return { ok: true };
+}
+
+/** Teks halaman langsung dari DOM (tanpa OCR) — bagus untuk artikel biasa, bukan PDF gambar. */
+async function pageDomText() {
+  if (!pageAlive()) return { error: 'Jendela Halaman sudah ditutup.' };
+  try {
+    const text = await pageView.webContents.executeJavaScript(
+      `(() => {
+        const sel = window.getSelection && String(window.getSelection());
+        const src = sel && sel.trim().length > 20 ? sel : (document.body ? document.body.innerText : '');
+        return String(src || '').replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim();
+      })()`,
+      true
+    );
+    if (!text || text.replace(/\s+/g, '').length < 20) {
+      return { error: 'Halaman ini hampir tidak punya teks biasa (mungkin PDF/gambar). Pakai "Baca halaman" (OCR).' };
+    }
+    return { text };
+  } catch (e) {
+    return { error: e.message || String(e) };
+  }
 }
 
 function showMain(inactive = false) {
@@ -268,8 +511,10 @@ async function selectAndRecognize() {
   }
 }
 
+const isPageRegion = () => !!(lastRegion && lastRegion.kind === 'page');
+
 function regionDisplay() {
-  if (!lastRegion) return null;
+  if (!lastRegion || isPageRegion()) return null;
   return screen.getAllDisplays().find((d) => d.id === lastRegion.displayId) || null;
 }
 function regionAbs() {
@@ -279,8 +524,75 @@ function regionAbs() {
   return { x: d.bounds.x + r.x, y: d.bounds.y + r.y, width: r.width, height: r.height };
 }
 function regionInfo() {
+  if (isPageRegion()) {
+    if (!pageAlive()) return null;
+    const r = lastRegion.rect || pageView.getBounds();
+    return { kind: 'page', whole: !lastRegion.rect, width: Math.round(r.width), height: Math.round(r.height) };
+  }
   const a = regionAbs();
-  return a ? { width: Math.round(a.width), height: Math.round(a.height) } : null;
+  return a ? { kind: 'screen', width: Math.round(a.width), height: Math.round(a.height) } : null;
+}
+
+/** Perkiraan seberapa banyak "tinta" (piksel yang beda jauh dari warna latar) dalam gambar, 0..1. */
+function inkRatio(img) {
+  const { width, height } = img.getSize();
+  if (!width || !height) return 0;
+  const buf = img.toBitmap(); // BGRA
+  const step = Math.max(1, Math.round(Math.sqrt((width * height) / 60000))); // ±60 ribu sampel
+  const hist = new Uint32Array(256);
+  const vals = [];
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const i = (y * width + x) * 4;
+      const v = (buf[i] + buf[i + 1] + buf[i + 2]) / 3;
+      vals.push(v);
+      hist[v | 0]++;
+    }
+  }
+  let bg = 0;
+  for (let v = 1; v < 256; v++) if (hist[v] > hist[bg]) bg = v;
+  let ink = 0;
+  for (const v of vals) if (Math.abs(v - bg) > 60) ink++;
+  return ink / vals.length;
+}
+
+/**
+ * Tunggu sampai area benar-benar berisi tulisan: halaman yang masih memuat (putih polos)
+ * atau PDF yang baru setengah digambar ditunggu dulu, lalu ditangkap lagi.
+ * @param {() => Promise<NativeImage>} capture
+ */
+async function waitForContent(capture, { maxWaitMs = 15000, settleMs = 350 } = {}) {
+  const BLANK = 0.0012; // di bawah ini dianggap kosong (beberapa kata saja sudah ±0.003)
+  const t0 = Date.now();
+  let img = await capture();
+  let ratio = inkRatio(img);
+  let waited = false;
+  while (ratio < BLANK && Date.now() - t0 < maxWaitMs) {
+    if (!waited) {
+      waited = true;
+      send('ocr:progress', 'Halaman masih kosong — menunggu tulisan muncul…');
+    }
+    await sleep(400);
+    img = await capture();
+    ratio = inkRatio(img);
+  }
+  if (ratio < BLANK) return { img, blank: true, waited };
+  // Tunggu gambar stabil (halaman digambar bertahap)
+  const t1 = Date.now();
+  while (Date.now() - t1 < 4000) {
+    await sleep(settleMs);
+    const next = await capture();
+    const r2 = inkRatio(next);
+    const changed = Math.abs(r2 - ratio) / Math.max(ratio, r2, 1e-6);
+    img = next;
+    ratio = r2;
+    if (changed < 0.06) break;
+    if (!waited) {
+      waited = true;
+      send('ocr:progress', 'Halaman masih digambar — menunggu…');
+    }
+  }
+  return { img, blank: false, waited };
 }
 
 /**
@@ -291,16 +603,37 @@ function regionInfo() {
  */
 async function recognizeLast(opt = {}) {
   if (!lastRegion) return { error: 'NO_REGION' };
-  const display = regionDisplay();
-  if (!display) return { error: 'Layar untuk area ini tidak ditemukan. Pilih area lagi.' };
+  const page = isPageRegion();
+  const display = page ? null : regionDisplay();
+  if (page && !pageAlive()) {
+    lastRegion = null;
+    send('region:changed', null);
+    return { error: 'NO_REGION' };
+  }
+  if (!page && !display) return { error: 'Layar untuk area ini tidak ditemukan. Pilih area lagi.' };
   if (ocrBusy) return { error: 'Masih memproses, tunggu sebentar.', busy: true };
   ocrBusy = true;
   let hidden = false;
   try {
-    hidden = await hideMainIfCovering(regionAbs());
-    const thumb = await captureDisplay(display);
-    const img = cropDip(thumb, display, lastRegion.rect);
-    const res = await ocr.recognize(nativeImage, img, settings, { dropEdges: !!opt.continuous });
+    let capture;
+    if (page) {
+      // Halaman masih memuat → tunggu dulu (maks. 8 dtk), baru tangkap
+      const t0 = Date.now();
+      while (pageAlive() && pageView.webContents.isLoading() && Date.now() - t0 < 8000) {
+        send('ocr:progress', 'Halaman masih dimuat — menunggu…');
+        await sleep(300);
+      }
+      capture = () => capturePageRegion(lastRegion.rect);
+    } else {
+      hidden = await hideMainIfCovering(regionAbs());
+      capture = async () => cropDip(await captureDisplay(display), display, lastRegion.rect);
+    }
+    const got = await waitForContent(capture);
+    if (got.blank) {
+      return { text: '', blank: true, same: false, anchored: true, engine: settings.ocrEngine, note: 'Area masih kosong setelah 15 detik menunggu — halaman belum tampil atau tidak ada tulisan.' };
+    }
+    if (got.waited) send('ocr:progress', 'Membaca teks…');
+    const res = await ocr.recognize(nativeImage, got.img, settings, { dropEdges: !!opt.continuous });
     if (!opt.continuous) return { text: res.text, engine: res.engine, note: res.note, lineCount: res.lines.length };
 
     if (opt.reset) prevContinuousLines = null;
@@ -333,6 +666,7 @@ function toPhysical(p) {
 async function doScroll({ at, notches, keepHidden }) {
   let point = null;
   let hidden = false;
+  if (at === 'page' || (at === 'region' && isPageRegion())) return scrollPage(notches);
   if (at === 'region') {
     const a = regionAbs();
     if (!a) return { error: 'NO_REGION' };
@@ -364,6 +698,7 @@ const HOTKEYS = {
   autoScroll: 'Ctrl+Alt+G',
   record: 'Ctrl+Alt+R',
   stopAll: 'Ctrl+Alt+X',
+  page: 'Ctrl+Alt+H',
 };
 const hotkeyStatus = {};
 
@@ -386,6 +721,10 @@ function onHotkey(action) {
     // Hotkey gulir: langsung di posisi mouse, tanpa lewat jendela
     const n = Math.max(1, settings.scrollNotches);
     doScroll({ at: 'cursor', notches: action === 'scrollUp' ? -n : n });
+    return;
+  }
+  if (action === 'page') {
+    openPage();
     return;
   }
   send('hotkey', action);
@@ -415,6 +754,7 @@ function buildTrayMenu() {
     { label: (s.recording ? 'Stop rekam' : 'Rekam layar') + '\t' + HOTKEYS.record, click: () => send('hotkey', 'record') },
     { label: 'Hentikan semua\t' + HOTKEYS.stopAll, click: () => send('hotkey', 'stopAll') },
     { type: 'separator' },
+    { label: 'Buka halaman di aplikasi\t' + HOTKEYS.page, click: () => openPage() },
     { label: 'Tampilkan Baca Layar', click: () => showMain() },
     {
       label: 'Keluar',
@@ -499,6 +839,47 @@ function registerIpc() {
   ipcMain.handle('app:state', (e, st) => {
     uiState = { ...uiState, ...st };
     buildTrayMenu();
+    pushPageState();
+  });
+
+  // Halaman di dalam aplikasi
+  ipcMain.handle('page:open', (e, url) => openPage(url));
+  ipcMain.handle('page:state', () => pageState());
+  ipcMain.handle('page:go', (e, url) => {
+    if (!pageAlive()) return openPage(url);
+    const u = normalizeUrl(url);
+    if (u) pageView.webContents.loadURL(u).catch(() => {});
+    return pageState();
+  });
+  ipcMain.handle('page:nav', (e, action) => {
+    if (!pageAlive()) return pageState();
+    const wc = pageView.webContents;
+    const h = wc.navigationHistory;
+    if (action === 'back' && h.canGoBack()) h.goBack();
+    else if (action === 'forward' && h.canGoForward()) h.goForward();
+    else if (action === 'reload') wc.reload();
+    else if (action === 'stop') wc.stop();
+    else if (action === 'home') wc.loadURL(DEFAULTS.pageUrl).catch(() => {});
+    return pageState();
+  });
+  ipcMain.handle('page:scroll', (e, notches) => scrollPage(notches));
+  ipcMain.handle('page:useWhole', () => usePageRegion());
+  ipcMain.handle('page:selectArea', () => selectPageArea());
+  ipcMain.handle('page:domText', async () => {
+    const r = await pageDomText();
+    if (r && r.text) {
+      showMain(true);
+      send('page:text', r.text);
+    }
+    return r;
+  });
+  // Tombol di bilah Halaman memicu alur yang sama seperti hotkey di jendela utama
+  ipcMain.handle('page:trigger', (e, action) => {
+    if (!['reread', 'continuous', 'stopAll'].includes(action)) return;
+    // Mulai Baca Terus dari jendela Halaman: pakai seluruh tampilan bila area belum di halaman ini
+    if (action === 'continuous' && !uiState.continuous && !isPageRegion()) usePageRegion();
+    showMain(true);
+    send('hotkey', action);
   });
 
   ipcMain.handle('ocr:select', () => selectAndRecognize());
@@ -667,7 +1048,10 @@ if (!app.requestSingleInstanceLock()) {
     registerHotkeys();
     setupUpdater();
     if (settings.ocrEngine === 'tesseract') setTimeout(() => ocr.warmUp(settings.ocrLang), 1500);
-    if (process.env.BACA_LAYAR_SELFTEST) require('./test/selftest')(mainWindow, { ocr, nativeImage, settings, app });
+    if (process.env.BACA_LAYAR_SELFTEST) {
+      const page = { openPage, pageState, usePageRegion, recognizeLast, scrollPage, pageDomText, getPageWin: () => pageWin };
+      require('./test/selftest')(mainWindow, { ocr, nativeImage, settings, app, page });
+    }
   });
   app.on('before-quit', () => {
     quitting = true;

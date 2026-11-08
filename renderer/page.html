@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Halaman — Baca Layar</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--panel); display: flex; flex-direction: column; padding: 0; margin: 0; }
+  .bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px 0; }
+  .bar.second { padding: 5px 8px 6px; border-bottom: 1px solid var(--line); }
+  .ib {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; min-width: 32px; padding: 0 9px;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); cursor: pointer; font-size: 12.5px; white-space: nowrap;
+  }
+  .ib:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .ib:disabled { opacity: .4; cursor: default; }
+  .ib svg { width: 16px; height: 16px; color: var(--muted); }
+  .ib.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .ib.primary svg { color: var(--accent-ink); }
+  .ib.flow svg { color: var(--flow); }
+  .ib.flow.on { background: var(--flow); border-color: var(--flow); color: var(--flow-ink); font-weight: 600; }
+  .ib.flow.on svg { color: var(--flow-ink); }
+  .ib.danger svg { color: var(--err); }
+  .ib kbd { margin-left: 2px; }
+  .ib.primary kbd { background: rgba(0,0,0,.14); color: var(--accent-ink); border-color: transparent; }
+  .ib.flow.on kbd { background: rgba(0,0,0,.14); color: var(--flow-ink); border-color: transparent; }
+  .url {
+    flex: 1; height: 32px; min-width: 120px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 13px; outline: none; user-select: text;
+  }
+  .url:focus { border-color: var(--accent); }
+  .sep { width: 1px; height: 22px; background: var(--line); margin: 0 3px; }
+  .status { margin-left: auto; font-size: 12px; color: var(--muted); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status.ok { color: var(--ok); } .status.error { color: var(--err); }
+  .pill { font-size: 11.5px; padding: 3px 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+  .pill.page { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .pill.flow { background: var(--flow-soft); color: var(--flow); border-color: transparent; }
+  .grow { flex: 1; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-read" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17 15l2 2 3-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-area" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-flow" viewBox="0 0 24 24"><path d="M5 6h10M5 10h7M5 14h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 9v10m0 0-3-3m3 3 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M8 19h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v15m0 0-6-6m6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V5m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="bar">
+  <button class="ib" id="btnBack" title="Kembali (Alt+←)"><svg><use href="#i-back"/></svg></button>
+  <button class="ib" id="btnFwd" title="Maju (Alt+→)"><svg><use href="#i-fwd"/></svg></button>
+  <button class="ib" id="btnReload" title="Muat ulang (F5)"><svg><use href="#i-reload"/></svg></button>
+  <button class="ib" id="btnHome" title="Perpustakaan digital UT"><svg><use href="#i-home"/></svg></button>
+  <input class="url" id="url" type="text" spellcheck="false" placeholder="Alamat halaman, mis. pustaka.ut.ac.id (Ctrl+L)">
+  <button class="ib" id="btnGo">Buka</button>
+</div>
+<div class="bar second">
+  <button class="ib primary" id="btnRead" title="Kenali teks yang tampak di halaman ini (OCR) lalu bacakan"><svg><use href="#i-read"/></svg>Baca halaman</button>
+  <button class="ib" id="btnArea" title="Seret kotak di atas bagian halaman yang mau dibaca (mis. hanya kolom teks modul)"><svg><use href="#i-area"/></svg>Pilih area</button>
+  <button class="ib flow" id="btnFlow" title="Baca → bacakan → gulir halaman ini sendiri → lanjut sampai akhir"><svg><use href="#i-flow"/></svg><span id="flowLabel">Baca Terus</span></button>
+  <button class="ib" id="btnText" title="Ambil teks halaman langsung tanpa OCR (untuk artikel/halaman web biasa, bukan PDF gambar)"><svg><use href="#i-text"/></svg>Teks halaman</button>
+  <button class="ib danger" id="btnStop" title="Hentikan suara & Baca Terus (Ctrl+Alt+X)"><svg><use href="#i-stop"/></svg></button>
+  <span class="sep"></span>
+  <button class="ib" id="btnDown" title="Gulir halaman ke bawah"><svg><use href="#i-down"/></svg></button>
+  <button class="ib" id="btnUp" title="Gulir halaman ke atas"><svg><use href="#i-up"/></svg></button>
+  <span class="grow"></span>
+  <span class="pill" id="pill">Siap</span>
+  <span class="status" id="status"></span>
+</div>
+<script src="page.js"></script>
+</body>
+</html>

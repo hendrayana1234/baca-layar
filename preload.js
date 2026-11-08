@@ -48,6 +48,21 @@ contextBridge.exposeInMainWorld('api', {
   onUpdateReady: on('update:ready'),
   installUpdate: invoke('update:install'),
 
+  // halaman di dalam aplikasi
+  pageOpen: invoke('page:open'),
+  pageState: invoke('page:state'),
+  pageGo: invoke('page:go'),
+  pageNav: invoke('page:nav'),
+  pageScroll: invoke('page:scroll'),
+  pageUseWhole: invoke('page:useWhole'),
+  pageSelectArea: invoke('page:selectArea'),
+  pageDomText: invoke('page:domText'),
+  pageTrigger: invoke('page:trigger'),
+  onPageState: on('page:state'),
+  onPageError: on('page:error'),
+  onPageFocusUrl: on('page:focusUrl'),
+  onPageText: on('page:text'),
+
   // jendela pilih area
   onOverlayInit: on('overlay:init'),
   overlayDone: (rect) => ipcRenderer.send('overlay:done', rect),

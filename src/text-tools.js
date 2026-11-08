@@ -213,15 +213,25 @@ function newLinesAfterScroll(prevLines, nextLines) {
   for (let j = prevLines.length - 1; j >= stop; j--) {
     const pj = prevLines[j];
     if (!usable(pj)) continue;
-    // Cari dari bawah agar baris yang sama di atas (mis. judul berulang) tidak terpilih.
+    // Pilih pasangan baris paling mirip (bukan yang pertama ketemu): teks berpola mirip
+    // (mis. "Paragraf 1 …", "Paragraf 9 …") tidak boleh saling tertukar. Baris sebelumnya ikut
+    // dicocokkan sebagai konfirmasi; teks persis sama dapat nilai tambah.
+    let best = null;
     for (let m = nextLines.length - 1; m >= 0; m--) {
-      if (similarity(pj.text, nextLines[m].text) < 0.82) continue;
-      // Konfirmasi dengan baris sebelumnya bila ada
+      const sim = similarity(pj.text, nextLines[m].text);
+      if (sim < 0.82) continue;
       const pPrev = prevLines[j - 1];
       const nPrev = nextLines[m - 1];
-      if (pPrev && nPrev && usable(pPrev) && usable(nPrev) && similarity(pPrev.text, nPrev.text) < 0.6) continue;
-      return { lines: nextLines.slice(m + 1), anchored: true, same: false };
+      let confirm = 0.5;
+      if (pPrev && nPrev && usable(pPrev) && usable(nPrev)) {
+        confirm = similarity(pPrev.text, nPrev.text);
+        if (confirm < 0.6) continue;
+      }
+      const exact = norm(pj.text) === norm(nextLines[m].text) ? 1 : 0;
+      const score = sim + confirm + exact;
+      if (!best || score > best.score) best = { m, score };
     }
+    if (best) return { lines: nextLines.slice(best.m + 1), anchored: true, same: false };
   }
   return { lines: nextLines, anchored: false, same: false };
 }

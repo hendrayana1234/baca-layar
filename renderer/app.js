@@ -385,9 +385,11 @@
     const line = $('#regionLine');
     line.classList.toggle('has', !!info);
     $('#btnRegionClear').classList.toggle('hidden', !info);
-    $('#regionText').innerHTML = info
-      ? `Area tersimpan ${info.width}×${info.height} — tekan <b>Ctrl+Alt+L</b> untuk baca ulang setelah ganti halaman.`
-      : 'Belum ada area. Klik <b>Pilih area</b>, lalu seret kotak di atas teks yang mau dibaca.';
+    $('#regionText').innerHTML = !info
+      ? 'Belum ada area. Klik <b>Pilih area</b>, lalu seret kotak di atas teks yang mau dibaca.'
+      : info.kind === 'page'
+        ? `Area: <b>${info.whole ? 'seluruh tampilan' : `${info.width}×${info.height}`} halaman di aplikasi</b> — baca ulang & gulir dilakukan di dalam jendela Halaman.`
+        : `Area tersimpan ${info.width}×${info.height} — tekan <b>Ctrl+Alt+L</b> untuk baca ulang setelah ganti halaman.`;
   }
   $('#btnRegionClear').addEventListener('click', async () => {
     await api.regionClear();
@@ -522,8 +524,8 @@
           stopContinuous('Baca Terus berhenti: ' + (r ? r.error : 'tidak ada hasil'), 'error');
           break;
         }
-        if (r.note && round === 1) toast(r.note);
-        if (r.same) {
+        if (r.note && (round === 1 || r.blank)) toast(r.note);
+        if (r.same || r.blank) {
           stuck++;
           if (stuck >= 2) {
             stopContinuous(`Sudah sampai akhir halaman. Selesai ✓ (${countWords(textEl.value)} kata)`, 'ok');
@@ -640,6 +642,13 @@
     setStatus('Dihentikan.');
   }
   $('#btnStopAll').addEventListener('click', stopAll);
+  $('#btnPage').addEventListener('click', () => api.pageOpen());
+  api.onPageText((text) => {
+    if (!text) return;
+    putText(text, S.appendText);
+    setStatus(`Teks halaman diambil (${countWords(text)} kata).`, 'ok');
+    if (S.autoSpeak) Player.speak(text);
+  });
 
   // ---------- rekam layar ----------
   let sourcesLoaded = false;
@@ -867,6 +876,7 @@
     autoScroll: 'Gulir otomatis mulai/berhenti',
     record: 'Rekam layar mulai/stop',
     stopAll: 'Hentikan suara, Baca Terus & gulir',
+    page: 'Buka halaman di aplikasi',
   };
   (async () => {
     S = await api.getSettings();

@@ -1,7 +1,7 @@
 {
   "name": "baca-layar",
   "productName": "Baca Layar",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Baca teks dari layar (OCR + suara), gulir otomatis, dan rekam layar",
   "main": "main.js",
   "author": "Hendrayana",
