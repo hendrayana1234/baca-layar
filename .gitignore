@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-linux/
 *.log
 # screenshot pribadi untuk uji OCR (berisi NIM & bookmark) — jangan diunggah
 test/fixtures/

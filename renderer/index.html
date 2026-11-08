@@ -32,7 +32,7 @@
     </div>
   </div>
   <div class="topright">
-    <button id="hdrUpdate" class="hdrupd" title="Cek / pasang update"><svg><use href="#i-again"/></svg><span>Update</span></button>
+    <button id="hdrUpdate" class="hdrupd winonly" title="Cek / pasang update"><svg><use href="#i-again"/></svg><span>Update</span></button>
     <span id="pill" class="pill">Siap</span>
   </div>
 </header>
@@ -45,14 +45,14 @@
 <nav class="tabs" role="tablist">
   <button role="tab" data-tab="baca" class="active">Baca</button>
   <button role="tab" data-tab="gulir">Gulir</button>
-  <button role="tab" data-tab="rekam">Rekam</button>
+  <button role="tab" data-tab="rekam" class="winonly">Rekam</button>
   <button role="tab" data-tab="atur">Atur</button>
 </nav>
 
 <main>
   <!-- ============ BACA ============ -->
   <section id="tab-baca" class="tab active">
-    <div class="actions">
+    <div class="actions winonly">
       <button id="btnSelect" class="act primary">
         <svg><use href="#i-area"/></svg>
         <span class="lbl"><b>Pilih area &amp; baca</b><kbd>Ctrl+Alt+O</kbd></span>
@@ -84,19 +84,20 @@
       <p class="muted small">Potret area → simpan PNG → gulir otomatis → potret lagi, sampai akhir dokumen. Hasilnya tersimpan berurutan (001.png, 002.png, …) untuk dibaca atau di-OCR belakangan.</p>
       <div class="row">
         <button id="btnSnapStart" class="btn primary"><svg><use href="#i-area"/></svg><span id="snapLabel">Mulai kumpulkan</span><kbd>Ctrl+Alt+S</kbd></button>
+        <button id="btnSnapArea" class="btn linuxonly" title="Pilih area yang mau dipotret"><svg><use href="#i-area"/></svg>Pilih area</button>
         <button id="btnSnapOnce" class="btn" title="Simpan satu screenshot area tersimpan"><svg><use href="#i-copy"/></svg>Potret sekali</button>
         <button id="btnSnapFolder" class="btn ghost" title="Buka folder hasil"><svg><use href="#i-folder"/></svg>Folder</button>
       </div>
-      <p class="muted small" id="snapInfo">Belum ada. Folder: Pictures\Baca Layar</p>
+      <p class="muted small" id="snapInfo">Belum ada. Folder: Pictures/Baca Layar</p>
     </div>
 
-    <button id="btnPage" class="pagebtn" title="Buka modul/halaman web di jendela Baca Layar sendiri, lalu baca & gulir tanpa menyentuh browser">
+    <button id="btnPage" class="pagebtn winonly" title="Buka modul/halaman web di jendela Baca Layar sendiri, lalu baca & gulir tanpa menyentuh browser">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>
       <span><b>Buka halaman di aplikasi</b><small>browser bawaan untuk modul UT / halaman web — baca & gulir dari dalam</small></span>
       <kbd>Ctrl+Alt+H</kbd>
     </button>
 
-    <div class="player">
+    <div class="player winonly">
       <button id="btnPlay" class="round" title="Bacakan / jeda"><svg><use href="#i-play"/></svg></button>
       <button id="btnStop" class="round ghost" title="Berhenti"><svg><use href="#i-stop"/></svg></button>
       <div class="voicebox">
@@ -116,7 +117,7 @@
       (Windows → Ucapan → Tambahkan suara → Bahasa Indonesia), lalu buka ulang aplikasi.
     </div>
 
-    <div class="textwrap">
+    <div class="textwrap winonly">
       <div class="texttools">
         <label class="check"><input type="checkbox" id="append" data-setting="appendText"> Tambah ke bawah</label>
         <span class="spacer"></span>
@@ -161,7 +162,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card winonly">
       <h3>Baca Terus</h3>
       <p class="muted">Aplikasi membaca area terpilih, membacakannya, lalu menggulir halaman sendiri dan lanjut membaca sampai akhir dokumen. Teks yang sudah dibaca tidak diulang.</p>
       <label class="field">
@@ -231,7 +232,7 @@
 
   <!-- ============ ATUR ============ -->
   <section id="tab-atur" class="tab">
-    <div class="card" id="updateCard">
+    <div class="card winonly" id="updateCard">
       <div class="cardhead">
         <h3>Update</h3>
         <span class="muted small">Versi terpasang <b id="ver2"></b></span>
@@ -244,7 +245,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card winonly">
       <h3>Pengenalan teks</h3>
       <label class="field"><span>Mesin</span>
         <select data-setting="ocrEngine">
@@ -270,7 +271,7 @@
       <label class="check"><input type="checkbox" data-setting="autoSpeak"> Langsung bacakan setelah area dipilih</label>
     </div>
 
-    <div class="card">
+    <div class="card winonly">
       <h3>Suara</h3>
       <p class="muted">Suara Bahasa Indonesia (Microsoft Andika) gratis dari Windows: Pengaturan → Waktu &amp; bahasa → Ucapan → Tambahkan suara.</p>
       <div class="row">

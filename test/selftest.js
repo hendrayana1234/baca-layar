@@ -144,6 +144,24 @@ module.exports = function selftest(win, { ocr, nativeImage, settings, app, page 
         if (files.length < 3 || files.length > 12) errors.push('snap: jumlah gambar aneh: ' + files.length);
         if (files[0] !== '001.png') errors.push('snap: nama file: ' + files[0]);
 
+        // 4a-linux) Area LAYAR (bukan halaman) + gulir xdotool: jendela Halaman ada di layar xvfb
+        if (process.platform === 'linux') {
+          page.openPage('file://' + html);
+          await sleep(1500);
+          const { screen } = require('electron');
+          const pw2 = page.getPageWin();
+          const cb = pw2.getContentBounds();
+          const disp = screen.getDisplayNearestPoint({ x: cb.x + 10, y: cb.y + 10 });
+          page.setRegion({ displayId: disp.id, rect: { x: cb.x - disp.bounds.x + 20, y: cb.y - disp.bounds.y + 120, width: cb.width - 60, height: cb.height - 140 } });
+          settings.snapFolder = path.join(outDir, 'snap-layar');
+          page.snapStart({ notches: 10, delayMs: 300 });
+          const t4 = Date.now();
+          while (page.snap.running && Date.now() - t4 < 60000) await sleep(300);
+          const f2 = fs.existsSync(page.snap.folder) ? fs.readdirSync(page.snap.folder).filter((f) => f.endsWith('.png')) : [];
+          log('kumpulkan screenshot LAYAR (xdotool):', f2.length, 'gambar, berhenti=' + !page.snap.running);
+          if (f2.length < 3) errors.push('snap layar: hanya ' + f2.length + ' gambar');
+        }
+
         // 4b) Halaman putih yang baru menampilkan tulisan setelah 2,5 detik → OCR harus menunggu
         const lazy = path.join(outDir, 'halaman-lambat.html');
         fs.writeFileSync(lazy, `<!doctype html><meta charset="utf-8"><title>Lambat</title><body style="font:22px Georgia,serif;margin:40px;background:#fff;color:#222"><div id="t"></div><script>setTimeout(()=>{document.getElementById('t').innerHTML='<p>Tulisan ini baru muncul setelah halaman selesai dimuat.</p><p>Baris kedua untuk memastikan OCR menunggu dengan benar.</p>'},2500)</script></body>`);

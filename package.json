@@ -11,7 +11,8 @@
     "start": "electron .",
     "test": "node test/run-tests.js",
     "dist": "electron-builder --win nsis --x64 --publish never",
-    "copy-tessdata": "node -e \"const fs=require('fs');fs.mkdirSync('tessdata',{recursive:true});for(const l of ['ind','eng'])fs.copyFileSync(require.resolve('@tesseract.js-data/'+l+'/package.json').replace('package.json','4.0.0_best_int/'+l+'.traineddata.gz'),'tessdata/'+l+'.traineddata.gz')\""
+    "copy-tessdata": "node -e \"const fs=require('fs');fs.mkdirSync('tessdata',{recursive:true});for(const l of ['ind','eng'])fs.copyFileSync(require.resolve('@tesseract.js-data/'+l+'/package.json').replace('package.json','4.0.0_best_int/'+l+'.traineddata.gz'),'tessdata/'+l+'.traineddata.gz')\"",
+    "dist:linux": "electron-builder --linux --x64 --publish never -c electron-builder-linux.json"
   },
   "dependencies": {
     "electron-updater": "^6.8.11",

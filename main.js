@@ -784,6 +784,29 @@ async function snapStart({ notches, delayMs } = {}) {
   return snapStatus();
 }
 
+/** Pilih area di layar tanpa OCR. */
+async function selectRegionOnly() {
+  if (ocrBusy || overlayWin) return { error: 'Masih memproses, tunggu sebentar.', busy: true };
+  ocrBusy = true;
+  let hidden = false;
+  try {
+    const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    hidden = await hideMainIfCovering(display.bounds);
+    const thumb = await captureDisplay(display);
+    const rect = await pickArea(display, thumb);
+    if (!rect || rect.width < 6 || rect.height < 6) return { cancelled: true };
+    lastRegion = { displayId: display.id, rect };
+    prevContinuousLines = null;
+    send('region:changed', regionInfo());
+    return { ok: true };
+  } catch (err) {
+    return { error: err.message || String(err) };
+  } finally {
+    if (hidden) showMain(true);
+    ocrBusy = false;
+  }
+}
+
 function snapStop() {
   if (!snap.running) return snapStatus();
   snap.gen++;
@@ -1057,25 +1080,11 @@ function registerIpc() {
     }
     return snapFolderRoot();
   });
-  // Pilih area dulu lalu langsung mulai kumpulkan (dipakai bila belum ada area)
+  // Pilih area saja (tanpa OCR), lalu opsional langsung mulai kumpulkan
+  ipcMain.handle('snap:selectArea', () => selectRegionOnly());
   ipcMain.handle('snap:selectAndStart', async (e, opt) => {
-    if (ocrBusy || overlayWin) return { error: 'Masih memproses, tunggu sebentar.', busy: true };
-    ocrBusy = true;
-    let hidden = false;
-    try {
-      const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-      hidden = await hideMainIfCovering(display.bounds);
-      const thumb = await captureDisplay(display);
-      const rect = await pickArea(display, thumb);
-      if (!rect || rect.width < 6 || rect.height < 6) return { cancelled: true };
-      lastRegion = { displayId: display.id, rect };
-      prevContinuousLines = null;
-      send('region:changed', regionInfo());
-    } catch (err) {
-      return { error: err.message || String(err) };
-    } finally {
-      ocrBusy = false;
-    }
+    const r = await selectRegionOnly();
+    if (!r.ok) return r;
     return snapStart(opt || {});
   });
   ipcMain.handle('ocr:select', () => selectAndRecognize());
@@ -1207,7 +1216,7 @@ function registerIpc() {
 // ---------------- Update otomatis (GitHub Releases) ----------------
 let updater = null;
 function setupUpdater() {
-  if (!app.isPackaged || process.env.BACA_LAYAR_SELFTEST) return;
+  if (!app.isPackaged || process.env.BACA_LAYAR_SELFTEST || process.platform !== 'win32') return;
   try {
     updater = require('electron-updater').autoUpdater;
   } catch (_) {
@@ -1276,9 +1285,9 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     registerHotkeys();
     setupUpdater();
-    if (settings.ocrEngine === 'tesseract') setTimeout(() => ocr.warmUp(settings.ocrLang), 1500);
+    if (process.platform === 'win32' && settings.ocrEngine === 'tesseract') setTimeout(() => ocr.warmUp(settings.ocrLang), 1500);
     if (process.env.BACA_LAYAR_SELFTEST) {
-      const page = { openPage, pageState, usePageRegion, recognizeLast, scrollPage, pageDomText, getPageWin: () => pageWin, snapStart, snapStop, snap };
+      const page = { openPage, pageState, usePageRegion, recognizeLast, scrollPage, pageDomText, getPageWin: () => pageWin, snapStart, snapStop, snap, setRegion: (r) => { lastRegion = r; prevContinuousLines = null; } };
       require('./test/selftest')(mainWindow, { ocr, nativeImage, settings, app, page });
     }
   });

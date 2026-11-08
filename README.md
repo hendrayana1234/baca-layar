@@ -30,6 +30,10 @@ Suara Bahasa Indonesia: **Pengaturan Windows → Waktu & bahasa → Ucapan → T
 - Ada kalimat terlewat → kecilkan *jarak gulir* di tab **Gulir**. Banyak kalimat diulang → besarkan.
 - Halaman lambat memuat → naikkan *tunggu setelah gulir*.
 
+## Versi Linux (hanya kumpulkan screenshot)
+
+`BacaLayar-x.y.z-linux-x64.AppImage` (atau `.deb`) berisi fitur **Kumpulkan screenshot** saja: pilih area → potret → gulir otomatis → potret lagi. Butuh `xdotool` untuk gulir (`sudo apt install xdotool`); di Wayland pakai `ydotool`. AppImage: `chmod +x` lalu jalankan. Build: `npm run dist:linux`.
+
 ## Pengembangan
 
 ```bash

@@ -44,12 +44,55 @@ function loadNative() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Linux: roda mouse lewat xdotool (X11) — ydotool sebagai cadangan (Wayland).
+function run(cmd, args) {
+  return new Promise((resolve, reject) => {
+    require('child_process').execFile(cmd, args, { timeout: 10000 }, (err, out) => (err ? reject(err) : resolve(String(out || ''))));
+  });
+}
+async function scrollLinux(physPoint, notches, restore) {
+  const n = Math.max(1, Math.min(40, Math.abs(Math.round(notches)) || 1));
+  const button = notches < 0 ? '4' : '5'; // 5 = ke bawah
+  try {
+    let old = null;
+    if (physPoint) {
+      const loc = await run('xdotool', ['getmouselocation', '--shell']);
+      const m = /X=(\d+)[\s\S]*Y=(\d+)/.exec(loc);
+      if (m) old = { x: +m[1], y: +m[2] };
+      await run('xdotool', ['mousemove', String(Math.round(physPoint.x)), String(Math.round(physPoint.y))]);
+      await sleep(40);
+    }
+    await run('xdotool', ['click', '--repeat', String(n), '--delay', '30', button]);
+    if (physPoint && restore && old) {
+      await sleep(80);
+      await run('xdotool', ['mousemove', String(old.x), String(old.y)]);
+    }
+    return 'xdotool';
+  } catch (e) {
+    if (e && e.code === 'ENOENT') {
+      try {
+        if (physPoint) await run('ydotool', ['mousemove', '--absolute', '-x', String(Math.round(physPoint.x)), '-y', String(Math.round(physPoint.y))]);
+        for (let i = 0; i < n; i++) {
+          await run('ydotool', ['mousemove', '--wheel', '-x', '0', '-y', notches < 0 ? '1' : '-1']);
+          await sleep(30);
+        }
+        return 'ydotool';
+      } catch (e2) {
+        if (e2 && e2.code === 'ENOENT') throw new Error('xdotool tidak terpasang. Pasang dulu: sudo apt install xdotool');
+        throw e2;
+      }
+    }
+    throw e;
+  }
+}
+
 /**
  * Gulir mouse.
  * @param {{x:number,y:number}|null} physPoint titik layar fisik; null = di posisi kursor sekarang
  * @param {number} notches jumlah "klik" roda, positif = ke bawah
  */
 async function scroll(physPoint, notches, restore = true) {
+  if (process.platform === 'linux') return scrollLinux(physPoint, notches, restore);
   const n = Math.max(1, Math.min(40, Math.abs(Math.round(notches)) || 1));
   const dir = notches < 0 ? 1 : -1; // nilai negatif pada mouse_event = turun
   const api = loadNative();

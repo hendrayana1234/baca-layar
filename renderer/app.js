@@ -681,12 +681,24 @@
   }
   $('#btnSnapStart').addEventListener('click', toggleSnap);
   $('#btnSnapOnce').addEventListener('click', async () => {
-    if (!(await api.regionInfo())) return selectArea();
+    if (!(await api.regionInfo())) {
+      if (document.body.classList.contains('lite')) {
+        const r = await api.snapSelectArea();
+        if (!r || r.cancelled || r.error) return setStatus(r && r.error ? 'Gagal: ' + r.error : 'Dibatalkan.');
+      } else return selectArea();
+    }
     const r = await api.snapOnce();
     if (r && r.error) return setStatus('Gagal: ' + r.error, 'error');
     setStatus('Screenshot disimpan: ' + r.file, 'ok');
   });
   $('#btnSnapFolder').addEventListener('click', () => api.snapOpenFolder());
+  $('#btnSnapArea').addEventListener('click', async () => {
+    setStatus('Seret kotak di atas bagian yang mau dipotret… (Esc batal)');
+    const r = await api.snapSelectArea();
+    if (r && r.cancelled) return setStatus('Dibatalkan.');
+    if (r && r.error) return setStatus('Gagal: ' + r.error, 'error');
+    setStatus('Area dipilih. Klik "Mulai kumpulkan" atau "Potret sekali".', 'ok');
+  });
   api.snapStatus().then((s) => s && (s.count || s.running) && renderSnap(s));
   api.onPageText((text) => {
     if (!text) return;
@@ -997,6 +1009,10 @@
     $('#autoSpeed').value = msToSpeed(S.autoScrollIntervalMs);
     syncAutoSpeed();
     $('#ver').textContent = info.version;
+    if (info.platform !== 'win32') {
+      document.body.classList.add('lite');
+      document.querySelector('.brand p').textContent = 'Kumpulkan screenshot layar (versi Linux)';
+    }
     $('#ver2').textContent = 'v' + info.version;
     $('#recFolder').textContent = info.recFolder;
     $('#hotkeys').innerHTML = Object.entries(info.hotkeys)

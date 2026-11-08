@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('api', {
   snapOnce: invoke('snap:once'),
   snapStart: invoke('snap:start'),
   snapSelectAndStart: invoke('snap:selectAndStart'),
+  snapSelectArea: invoke('snap:selectArea'),
   snapStop: invoke('snap:stop'),
   snapStatus: invoke('snap:status'),
   snapOpenFolder: invoke('snap:openFolder'),
