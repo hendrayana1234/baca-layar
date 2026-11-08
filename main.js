@@ -644,6 +644,15 @@ function setupUpdater() {
 }
 
 // ---------------- Mulai ----------------
+// Error tak terduga dicatat ke log.txt dan ditampilkan di status, bukan dialog yang menghentikan kerja.
+const reportCrash = (kind) => (err) => {
+  const msg = err && err.stack ? err.stack : String(err);
+  mouse.logError(`${kind}: ${msg}`);
+  send('ocr:progress', 'Terjadi error: ' + String((err && err.message) || err).split('\n')[0]);
+};
+process.on('uncaughtException', reportCrash('uncaughtException'));
+process.on('unhandledRejection', reportCrash('unhandledRejection'));
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

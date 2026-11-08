@@ -7,6 +7,14 @@ const { preprocess } = require('./image-prep');
 const T = require('./text-tools');
 const { runScript, readJsonFile } = require('./winps');
 
+function logError(msg) {
+  try {
+    require('./mouse').logError(msg);
+  } catch (_) {
+    console.error(msg);
+  }
+}
+
 const TESSDATA = path.join(__dirname, '..', 'tessdata');
 
 // Satu worker aktif: { langs, promise }. Ganti bahasa → worker lama dimatikan dulu.
@@ -28,6 +36,9 @@ function getWorker(langs) {
       langPath: TESSDATA,
       cacheMethod: 'none',
       gzip: true,
+      // Tanpa ini tesseract.js melempar error yang tidak tertangkap dan memunculkan dialog error.
+      // Error tetap sampai ke pemanggil lewat promise yang ditolak.
+      errorHandler: (err) => logError('Tesseract: ' + (err && err.message ? err.message : err)),
     });
     await w.setParameters({ preserve_interword_spaces: '1' });
     return w;
