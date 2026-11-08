@@ -52,6 +52,16 @@ contextBridge.exposeInMainWorld('api', {
   onUpdateStatus: on('update:status'),
   onUpdateShow: on('update:show'),
 
+  // kumpulkan screenshot
+  snapOnce: invoke('snap:once'),
+  snapStart: invoke('snap:start'),
+  snapSelectAndStart: invoke('snap:selectAndStart'),
+  snapStop: invoke('snap:stop'),
+  snapStatus: invoke('snap:status'),
+  snapOpenFolder: invoke('snap:openFolder'),
+  snapChooseFolder: invoke('snap:chooseFolder'),
+  onSnapStatus: on('snap:status'),
+
   // halaman di dalam aplikasi
   pageOpen: invoke('page:open'),
   pageState: invoke('page:state'),

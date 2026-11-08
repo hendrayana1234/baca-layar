@@ -53,6 +53,7 @@ const DEFAULTS = {
   trayHintShown: false,
   openAtLogin: false,
   pageUrl: 'https://pustaka.ut.ac.id/',
+  snapFolder: '',
   pageBounds: null,
 };
 let settings = { ...DEFAULTS };
@@ -657,6 +658,141 @@ async function recognizeLast(opt = {}) {
   }
 }
 
+// ---------------- Kumpulkan screenshot (tanpa OCR) ----------------
+// Potret area → simpan PNG → gulir → potret lagi, sampai tampilan tidak berubah lagi.
+const snap = { running: false, gen: 0, count: 0, folder: '', last: '' };
+
+function snapFolderRoot() {
+  return settings.snapFolder || path.join(app.getPath('pictures'), 'Baca Layar');
+}
+
+/** Tangkap area terakhir (layar atau halaman di aplikasi) sebagai NativeImage. */
+async function captureRegionImage() {
+  if (!lastRegion) throw new Error('NO_REGION');
+  if (isPageRegion()) return capturePageRegion(lastRegion.rect);
+  const display = regionDisplay();
+  if (!display) throw new Error('Layar untuk area ini tidak ditemukan. Pilih area lagi.');
+  return cropDip(await captureDisplay(display), display, lastRegion.rect);
+}
+
+/** Sidik jari kasar gambar (64×64 abu-abu) untuk tahu apakah tampilan berubah. */
+function thumbSig(img) {
+  const small = img.resize({ width: 64, height: 64, quality: 'good' }).toBitmap();
+  const out = new Uint8Array(64 * 64);
+  for (let i = 0; i < out.length; i++) out[i] = (small[i * 4] + small[i * 4 + 1] + small[i * 4 + 2]) / 3;
+  return out;
+}
+function sigDiff(a, b) {
+  if (!a || !b) return 1;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 24) d++;
+  return d / a.length;
+}
+
+function snapStatus(extra = {}) {
+  const s = { running: snap.running, count: snap.count, folder: snap.folder, last: snap.last, ...extra };
+  send('snap:status', s);
+  return s;
+}
+
+/** Simpan satu screenshot area terakhir. */
+async function snapOnce() {
+  if (!lastRegion) return { error: 'NO_REGION' };
+  try {
+    let hidden = false;
+    if (!isPageRegion()) hidden = await hideMainIfCovering(regionAbs());
+    const img = await captureRegionImage();
+    if (hidden) showMain(true);
+    const dir = snapFolderRoot();
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `Tangkapan ${stamp()}.png`);
+    fs.writeFileSync(file, img.toPNG());
+    snap.last = file;
+    snapStatus({ saved: file });
+    return { ok: true, file };
+  } catch (e) {
+    return { error: e.message || String(e) };
+  }
+}
+
+/** Mulai kumpulkan: potret → simpan → gulir → … sampai tampilan sama 2× berturut-turut. */
+async function snapStart({ notches, delayMs } = {}) {
+  if (snap.running) return snapStatus();
+  if (!lastRegion) return { error: 'NO_REGION' };
+  const my = ++snap.gen;
+  snap.running = true;
+  snap.count = 0;
+  snap.folder = path.join(snapFolderRoot(), `Tangkapan ${stamp()}`);
+  fs.mkdirSync(snap.folder, { recursive: true });
+  snapStatus();
+  const alive = () => snap.running && my === snap.gen;
+  (async () => {
+    let prev = null;
+    let sameRuns = 0;
+    let hidden = false;
+    let reason = 'selesai';
+    try {
+      if (!isPageRegion()) hidden = await hideMainIfCovering(regionAbs());
+      while (alive() && snap.count < 2000) {
+        send('ocr:progress', `Kumpulkan screenshot · memotret #${snap.count + 1}…`);
+        const got = await waitForContent(captureRegionImage, { maxWaitMs: 15000 });
+        if (!alive()) break;
+        const sig = thumbSig(got.img);
+        if (got.blank) {
+          sameRuns++;
+          if (sameRuns >= 2) {
+            reason = 'area kosong';
+            break;
+          }
+        } else if (sigDiff(prev, sig) < 0.01) {
+          sameRuns++;
+          if (sameRuns >= 2) {
+            reason = 'sampai akhir (tampilan tidak berubah lagi)';
+            break;
+          }
+        } else {
+          sameRuns = 0;
+          snap.count++;
+          const file = path.join(snap.folder, String(snap.count).padStart(3, '0') + '.png');
+          fs.writeFileSync(file, got.img.toPNG());
+          snap.last = file;
+          prev = sig;
+          snapStatus({ saved: file });
+        }
+        if (!alive()) break;
+        send('ocr:progress', `Kumpulkan screenshot · ${snap.count} tersimpan, menggulir…`);
+        const r = await doScroll({ at: 'region', notches: notches || settings.scrollNotches, keepHidden: true });
+        if (r && r.error) {
+          reason = 'gagal menggulir: ' + r.error;
+          break;
+        }
+        await sleep(Number(delayMs || settings.scrollDelayMs) || 900);
+      }
+    } catch (e) {
+      reason = 'error: ' + (e.message || e);
+    } finally {
+      if (my === snap.gen) {
+        snap.running = false;
+        snapStatus({ done: true, reason });
+        send('ocr:progress', `Kumpulkan screenshot ${reason} — ${snap.count} gambar di ${snap.folder}`);
+        buildTrayMenu();
+      }
+      if (hidden) showMain(true);
+    }
+  })();
+  buildTrayMenu();
+  return snapStatus();
+}
+
+function snapStop() {
+  if (!snap.running) return snapStatus();
+  snap.gen++;
+  snap.running = false;
+  snapStatus({ done: true, reason: 'dihentikan' });
+  buildTrayMenu();
+  return snapStatus();
+}
+
 // ---------------- Gulir mouse ----------------
 function toPhysical(p) {
   if (typeof screen.dipToScreenPoint === 'function') return screen.dipToScreenPoint(p);
@@ -699,6 +835,7 @@ const HOTKEYS = {
   record: 'Ctrl+Alt+R',
   stopAll: 'Ctrl+Alt+X',
   page: 'Ctrl+Alt+H',
+  snap: 'Ctrl+Alt+S',
 };
 const hotkeyStatus = {};
 
@@ -752,6 +889,10 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     { label: (s.recording ? 'Stop rekam' : 'Rekam layar') + '\t' + HOTKEYS.record, click: () => send('hotkey', 'record') },
+    {
+      label: (snap.running ? `Hentikan kumpulkan screenshot (${snap.count})` : 'Kumpulkan screenshot (potret + gulir)') + '\t' + HOTKEYS.snap,
+      click: () => send('hotkey', 'snap'),
+    },
     { label: 'Hentikan semua\t' + HOTKEYS.stopAll, click: () => send('hotkey', 'stopAll') },
     { type: 'separator' },
     { label: 'Buka halaman di aplikasi\t' + HOTKEYS.page, click: () => openPage() },
@@ -899,6 +1040,44 @@ function registerIpc() {
     send('hotkey', action);
   });
 
+  ipcMain.handle('snap:once', () => snapOnce());
+  ipcMain.handle('snap:start', (e, opt) => snapStart(opt || {}));
+  ipcMain.handle('snap:stop', () => snapStop());
+  ipcMain.handle('snap:status', () => snapStatus());
+  ipcMain.handle('snap:openFolder', () => {
+    const d = snap.folder || snapFolderRoot();
+    fs.mkdirSync(d, { recursive: true });
+    return shell.openPath(d);
+  });
+  ipcMain.handle('snap:chooseFolder', async () => {
+    const r = await dialog.showOpenDialog(mainWindow, { title: 'Folder untuk screenshot', defaultPath: snapFolderRoot(), properties: ['openDirectory', 'createDirectory'] });
+    if (!r.canceled && r.filePaths[0]) {
+      settings.snapFolder = r.filePaths[0];
+      saveSettings();
+    }
+    return snapFolderRoot();
+  });
+  // Pilih area dulu lalu langsung mulai kumpulkan (dipakai bila belum ada area)
+  ipcMain.handle('snap:selectAndStart', async (e, opt) => {
+    if (ocrBusy || overlayWin) return { error: 'Masih memproses, tunggu sebentar.', busy: true };
+    ocrBusy = true;
+    let hidden = false;
+    try {
+      const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+      hidden = await hideMainIfCovering(display.bounds);
+      const thumb = await captureDisplay(display);
+      const rect = await pickArea(display, thumb);
+      if (!rect || rect.width < 6 || rect.height < 6) return { cancelled: true };
+      lastRegion = { displayId: display.id, rect };
+      prevContinuousLines = null;
+      send('region:changed', regionInfo());
+    } catch (err) {
+      return { error: err.message || String(err) };
+    } finally {
+      ocrBusy = false;
+    }
+    return snapStart(opt || {});
+  });
   ipcMain.handle('ocr:select', () => selectAndRecognize());
   ipcMain.handle('ocr:last', (e, opt) => recognizeLast(opt || {}));
   ipcMain.handle('region:info', () => regionInfo());
@@ -1099,7 +1278,7 @@ if (!app.requestSingleInstanceLock()) {
     setupUpdater();
     if (settings.ocrEngine === 'tesseract') setTimeout(() => ocr.warmUp(settings.ocrLang), 1500);
     if (process.env.BACA_LAYAR_SELFTEST) {
-      const page = { openPage, pageState, usePageRegion, recognizeLast, scrollPage, pageDomText, getPageWin: () => pageWin };
+      const page = { openPage, pageState, usePageRegion, recognizeLast, scrollPage, pageDomText, getPageWin: () => pageWin, snapStart, snapStop, snap };
       require('./test/selftest')(mainWindow, { ocr, nativeImage, settings, app, page });
     }
   });

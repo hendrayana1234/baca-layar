@@ -8,6 +8,7 @@ Aplikasi Windows untuk **membaca teks langsung dari layar** — modul PDF, halam
 - **Pilih area & baca** (`Ctrl+Alt+O`) — seret kotak di atas tulisan; teks muncul dan langsung dibacakan.
 - **Baca ulang area** (`Ctrl+Alt+L`) — setelah ganti halaman, baca lagi area yang sama.
 - **Baca Terus** (`Ctrl+Alt+B`) — baca area → bacakan → gulir ke bawah sendiri → lanjut, sampai akhir dokumen. Kalimat yang sudah dibaca tidak diulang.
+- **Kumpulkan screenshot** (`Ctrl+Alt+S`) — tanpa OCR: potret area → simpan PNG → gulir otomatis → potret lagi, sampai akhir dokumen. Tersimpan berurutan (001.png, 002.png, …) di `Pictures\Baca Layar\Tangkapan <tanggal>` untuk dibaca/di-OCR belakangan. Berhenti sendiri bila tampilan tidak berubah lagi.
 - **Gulir mouse**: `Ctrl+Alt+PageDown` / `Ctrl+Alt+PageUp` di posisi mouse, dan **gulir otomatis** (`Ctrl+Alt+G`) dengan kecepatan yang bisa diatur.
 - **Tunggu halaman tampil** — kalau area masih putih (halaman sedang memuat / PDF belum digambar), aplikasi menunggu sampai tulisan muncul (maks. 15 detik) sebelum membaca.
 - **Pembersih watermark** — watermark tipis (mis. NIM di modul UT) tidak ikut terbaca.

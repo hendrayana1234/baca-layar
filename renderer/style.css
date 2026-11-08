@@ -293,3 +293,6 @@ textarea:focus { outline: none; }
 .hdrupd:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .hdrupd.has { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .hdrupd.has span::after { content: " siap"; }
+.snapcard .btn.on { background: var(--flow); border-color: var(--flow); color: var(--flow-ink); }
+.snapcard .btn kbd { margin-left: 2px; }
+.snapcard .btn.primary kbd { background: rgba(0,0,0,.14); color: var(--accent-ink); border-color: transparent; }

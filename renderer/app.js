@@ -37,6 +37,9 @@
     } else if (state.reading) {
       p.classList.add('busy');
       p.textContent = Player.isPaused() ? 'Dijeda' : 'Membacakan';
+    } else if (state.snapping) {
+      p.classList.add('flow');
+      p.textContent = 'Kumpulkan screenshot';
     } else if (state.autoScroll) {
       p.classList.add('flow');
       p.textContent = 'Gulir otomatis';
@@ -636,6 +639,7 @@
   $('#btnContinuous').addEventListener('click', toggleContinuous);
   $('#btnContinuous2').addEventListener('click', toggleContinuous);
   function stopAll() {
+    api.snapStop().then(renderSnap);
     stopContinuous();
     stopAutoScroll();
     Player.stop();
@@ -643,6 +647,47 @@
   }
   $('#btnStopAll').addEventListener('click', stopAll);
   $('#btnPage').addEventListener('click', () => api.pageOpen());
+
+  // ---------- kumpulkan screenshot ----------
+  let snapRunning = false;
+  function renderSnap(s) {
+    snapRunning = !!s.running;
+    $('#btnSnapStart').classList.toggle('on', snapRunning);
+    $('#snapLabel').textContent = snapRunning ? `Hentikan (${s.count} tersimpan)` : 'Mulai kumpulkan';
+    const pill = $('#snapPill');
+    pill.classList.toggle('hidden', !snapRunning);
+    pill.textContent = '● ' + s.count;
+    const info = $('#snapInfo');
+    if (s.done) {
+      info.textContent = `${s.reason || 'selesai'} — ${s.count} gambar di ${s.folder}`;
+      if (s.count) toast(`Kumpulkan screenshot ${s.reason || 'selesai'}: ${s.count} gambar.`, 6000);
+    } else if (s.saved) info.textContent = `Tersimpan: ${s.saved}`;
+    else if (snapRunning) info.textContent = `Berjalan… folder: ${s.folder}`;
+    state.snapping = snapRunning;
+    refreshPill();
+  }
+  api.onSnapStatus(renderSnap);
+  async function toggleSnap() {
+    if (snapRunning) return renderSnap(await api.snapStop());
+    if (state.continuous) stopContinuous();
+    stopAutoScroll();
+    Player.stop();
+    const hasRegion = await api.regionInfo();
+    setStatus(hasRegion ? 'Kumpulkan screenshot dimulai…' : 'Seret kotak di atas bagian yang mau dipotret berulang… (Esc batal)');
+    const r = hasRegion ? await api.snapStart({}) : await api.snapSelectAndStart({});
+    if (r && r.cancelled) return setStatus('Dibatalkan.');
+    if (r && r.error) return setStatus('Gagal: ' + r.error, 'error');
+    renderSnap(r);
+  }
+  $('#btnSnapStart').addEventListener('click', toggleSnap);
+  $('#btnSnapOnce').addEventListener('click', async () => {
+    if (!(await api.regionInfo())) return selectArea();
+    const r = await api.snapOnce();
+    if (r && r.error) return setStatus('Gagal: ' + r.error, 'error');
+    setStatus('Screenshot disimpan: ' + r.file, 'ok');
+  });
+  $('#btnSnapFolder').addEventListener('click', () => api.snapOpenFolder());
+  api.snapStatus().then((s) => s && (s.count || s.running) && renderSnap(s));
   api.onPageText((text) => {
     if (!text) return;
     putText(text, S.appendText);
@@ -851,6 +896,8 @@
         return toggleAutoScroll(true);
       case 'record':
         return state.recording ? stopRecording() : startRecording();
+      case 'snap':
+        return toggleSnap();
       case 'stopAll':
         return stopAll();
     }
@@ -940,6 +987,7 @@
     record: 'Rekam layar mulai/stop',
     stopAll: 'Hentikan suara, Baca Terus & gulir',
     page: 'Buka halaman di aplikasi',
+    snap: 'Kumpulkan screenshot (potret + gulir) mulai/berhenti',
   };
   (async () => {
     S = await api.getSettings();

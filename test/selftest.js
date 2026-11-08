@@ -129,6 +129,21 @@ module.exports = function selftest(win, { ocr, nativeImage, settings, app, page 
         if (!dom.text || !/Paragraf nomor 40/.test(dom.text)) errors.push('halaman: teks DOM gagal');
         await shot(pw, 'halaman-setelah-gulir.png');
 
+        // 4a) Kumpulkan screenshot: potret + gulir sampai akhir halaman uji (40 paragraf)
+        page.openPage('file://' + html);
+        await sleep(1500);
+        page.usePageRegion();
+        const sfolder = path.join(outDir, 'snap');
+        settings.snapFolder = sfolder;
+        page.snapStart({ notches: 10, delayMs: 300 });
+        const t3 = Date.now();
+        while (page.snap.running && Date.now() - t3 < 60000) await sleep(300);
+        const files = fs.existsSync(page.snap.folder) ? fs.readdirSync(page.snap.folder).filter((f) => f.endsWith('.png')) : [];
+        log('kumpulkan screenshot:', files.length, 'gambar, berhenti sendiri=' + !page.snap.running, 'dalam', Date.now() - t3, 'ms');
+        if (page.snap.running) { page.snapStop(); errors.push('snap: tidak berhenti sendiri'); }
+        if (files.length < 3 || files.length > 12) errors.push('snap: jumlah gambar aneh: ' + files.length);
+        if (files[0] !== '001.png') errors.push('snap: nama file: ' + files[0]);
+
         // 4b) Halaman putih yang baru menampilkan tulisan setelah 2,5 detik → OCR harus menunggu
         const lazy = path.join(outDir, 'halaman-lambat.html');
         fs.writeFileSync(lazy, `<!doctype html><meta charset="utf-8"><title>Lambat</title><body style="font:22px Georgia,serif;margin:40px;background:#fff;color:#222"><div id="t"></div><script>setTimeout(()=>{document.getElementById('t').innerHTML='<p>Tulisan ini baru muncul setelah halaman selesai dimuat.</p><p>Baris kedua untuk memastikan OCR menunggu dengan benar.</p>'},2500)</script></body>`);

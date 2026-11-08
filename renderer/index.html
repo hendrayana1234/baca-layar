@@ -76,6 +76,20 @@
       <button id="btnRegionClear" class="link hidden">lupakan area</button>
     </div>
 
+    <div class="card snapcard">
+      <div class="cardhead">
+        <h3>Kumpulkan screenshot <span class="muted small">(tanpa OCR)</span></h3>
+        <span class="pill hidden" id="snapPill">● 0</span>
+      </div>
+      <p class="muted small">Potret area → simpan PNG → gulir otomatis → potret lagi, sampai akhir dokumen. Hasilnya tersimpan berurutan (001.png, 002.png, …) untuk dibaca atau di-OCR belakangan.</p>
+      <div class="row">
+        <button id="btnSnapStart" class="btn primary"><svg><use href="#i-area"/></svg><span id="snapLabel">Mulai kumpulkan</span><kbd>Ctrl+Alt+S</kbd></button>
+        <button id="btnSnapOnce" class="btn" title="Simpan satu screenshot area tersimpan"><svg><use href="#i-copy"/></svg>Potret sekali</button>
+        <button id="btnSnapFolder" class="btn ghost" title="Buka folder hasil"><svg><use href="#i-folder"/></svg>Folder</button>
+      </div>
+      <p class="muted small" id="snapInfo">Belum ada. Folder: Pictures\Baca Layar</p>
+    </div>
+
     <button id="btnPage" class="pagebtn" title="Buka modul/halaman web di jendela Baca Layar sendiri, lalu baca & gulir tanpa menyentuh browser">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>
       <span><b>Buka halaman di aplikasi</b><small>browser bawaan untuk modul UT / halaman web — baca & gulir dari dalam</small></span>
