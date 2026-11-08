@@ -53,7 +53,8 @@
   }
 
   async function countdown(n, msg) {
-    if (document.hidden) return;
+    // document.hidden tidak bisa dipakai (backgroundThrottling: false) — tanya ke proses utama.
+    if (!(await api.isWindowVisible())) return;
     const box = $('#countdown');
     box.querySelector('.msg').textContent = msg;
     box.classList.remove('hidden');
@@ -182,8 +183,15 @@
       const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
       try {
         audio.src = url;
-        await audio.play();
-        await waitAudioEnd(my);
+        const ended = waitAudioEnd(my);
+        try {
+          await audio.play();
+        } catch (e) {
+          // Dijeda tepat saat bagian ini mulai → tunggu dilanjutkan. Error lain (WAV rusak) → lewati bagian ini.
+          const pausedNow = e && e.name === 'AbortError' && paused && my === token;
+          if (!pausedNow && finishWait) finishWait();
+        }
+        await ended;
       } finally {
         URL.revokeObjectURL(url);
       }
@@ -405,7 +413,7 @@
     putText(r.text, S.appendText);
     setStatus(`Terbaca ${countWords(r.text)} kata (${r.engine === 'windows' ? 'OCR Windows' : 'Tesseract'}).`, 'ok');
     if (speak) Player.speak(r.text);
-    else if (document.hidden) api.showWindow(true);
+    else api.isWindowVisible().then((v) => v || api.showWindow(true));
     return true;
   }
 
@@ -448,8 +456,13 @@
     $('#contLabel').textContent = state.continuous ? 'Hentikan Baca Terus' : 'Baca Terus';
     $('#contLabel2').textContent = state.continuous ? 'Hentikan Baca Terus' : 'Mulai Baca Terus';
   }
+  // Setiap putaran Baca Terus / gulir otomatis punya nomor sendiri; berhenti = nomor naik,
+  // jadi putaran lama yang masih menunggu langsung keluar dan tidak berjalan dobel.
+  let contGen = 0;
+  let autoGen = 0;
   function stopContinuous(msg, kind) {
     if (!state.continuous) return;
+    contGen++;
     state.continuous = false;
     Player.stop();
     updateContinuousUI();
@@ -477,6 +490,8 @@
       }
     }
     state.continuous = true;
+    const my = ++contGen;
+    const alive = () => state.continuous && my === contGen;
     updateContinuousUI();
     pushState();
     if (!S.appendText) {
@@ -487,42 +502,56 @@
     let stuck = 0;
     let warned = false;
     let round = 0;
-    while (state.continuous) {
-      round++;
-      setStatus(`Baca Terus · bagian ${round}: membaca layar…`);
-      const r = await api.ocrLast({ continuous: true, reset: first, keepHidden: true });
-      first = false;
-      if (!state.continuous) break;
-      if (!r || r.error) {
-        stopContinuous('Baca Terus berhenti: ' + (r ? r.error : 'tidak ada hasil'), 'error');
-        break;
-      }
-      if (r.note && round === 1) toast(r.note);
-      if (r.same) {
-        stuck++;
-        if (stuck >= 2) {
-          stopContinuous(`Sudah sampai akhir halaman. Selesai ✓ (${countWords(textEl.value)} kata)`, 'ok');
+    let busyWait = 0;
+    try {
+      while (alive()) {
+        round++;
+        setStatus(`Baca Terus · bagian ${round}: membaca layar…`);
+        const r = await api.ocrLast({ continuous: true, reset: first, keepHidden: true });
+        if (!alive()) break;
+        if (r && r.busy && busyWait < 60) {
+          // putaran sebelumnya masih menyelesaikan OCR — tunggu sebentar lalu coba lagi
+          busyWait++;
+          round--;
+          await sleep(250);
+          continue;
+        }
+        first = false;
+        busyWait = 0;
+        if (!r || r.error) {
+          stopContinuous('Baca Terus berhenti: ' + (r ? r.error : 'tidak ada hasil'), 'error');
           break;
         }
-      } else stuck = 0;
-      if (!r.anchored && round > 1 && !warned) {
-        warned = true;
-        toast('Sebagian teks mungkin terlewat — kecilkan "jarak gulir" di tab Gulir.', 6000);
+        if (r.note && round === 1) toast(r.note);
+        if (r.same) {
+          stuck++;
+          if (stuck >= 2) {
+            stopContinuous(`Sudah sampai akhir halaman. Selesai ✓ (${countWords(textEl.value)} kata)`, 'ok');
+            break;
+          }
+        } else stuck = 0;
+        if (!r.anchored && round > 1 && !warned) {
+          warned = true;
+          toast('Sebagian teks mungkin terlewat — kecilkan "jarak gulir" di tab Gulir.', 6000);
+        }
+        if (r.text) {
+          putText(r.text, true);
+          setStatus(`Baca Terus · bagian ${round}: membacakan…`);
+          await Player.speak(r.text);
+          while (alive() && Player.isPaused()) await sleep(300);
+        }
+        if (!alive()) break;
+        setStatus(`Baca Terus · menggulir ${S.scrollNotches} klik…`);
+        const s = await api.scroll({ at: 'region', notches: S.scrollNotches, keepHidden: true });
+        if (!alive()) break;
+        if (s && s.error) {
+          stopContinuous('Gagal menggulir: ' + s.error, 'error');
+          break;
+        }
+        await sleep(Number(S.scrollDelayMs) || 900);
       }
-      if (r.text) {
-        putText(r.text, true);
-        setStatus(`Baca Terus · bagian ${round}: membacakan…`);
-        await Player.speak(r.text);
-        while (state.continuous && Player.isPaused()) await sleep(300);
-      }
-      if (!state.continuous) break;
-      setStatus(`Baca Terus · menggulir ${S.scrollNotches} klik…`);
-      const s = await api.scroll({ at: 'region', notches: S.scrollNotches, keepHidden: true });
-      if (s && s.error) {
-        stopContinuous('Gagal menggulir: ' + s.error, 'error');
-        break;
-      }
-      await sleep(Number(S.scrollDelayMs) || 900);
+    } catch (e) {
+      if (alive()) stopContinuous('Baca Terus berhenti: ' + (e && e.message ? e.message : e), 'error');
     }
   }
   function toggleContinuous() {
@@ -560,6 +589,7 @@
 
   function stopAutoScroll() {
     if (!state.autoScroll) return;
+    autoGen++;
     state.autoScroll = false;
     $('#autoLabel').textContent = 'Mulai gulir otomatis';
     $('#btnAutoScroll').classList.remove('on');
@@ -572,13 +602,22 @@
     if (!fromHotkey && (await api.cursorOnOwnWindow())) {
       await countdown(3, 'Arahkan mouse ke halaman yang mau digulir');
     }
+    if (state.autoScroll) return; // sudah dimulai dari tempat lain selama hitung mundur
     state.autoScroll = true;
+    const my = ++autoGen;
+    const alive = () => state.autoScroll && my === autoGen;
     $('#autoLabel').textContent = 'Hentikan gulir otomatis';
     $('#btnAutoScroll').classList.add('on');
     pushState();
     setStatus('Gulir otomatis berjalan di posisi mouse. Ctrl+Alt+G untuk berhenti.');
-    while (state.autoScroll) {
-      const r = await api.scroll({ at: 'cursor', notches: Number(S.autoScrollNotches) || 1 });
+    while (alive()) {
+      let r;
+      try {
+        r = await api.scroll({ at: 'cursor', notches: Number(S.autoScrollNotches) || 1 });
+      } catch (e) {
+        r = { error: e && e.message ? e.message : String(e) };
+      }
+      if (!alive()) break;
       if (r && r.error) {
         stopAutoScroll();
         setStatus('Gagal menggulir: ' + r.error, 'error');
@@ -665,8 +704,18 @@
     $('#recTime').classList.toggle('on', on);
   }
 
+  // Tekan Ctrl+Alt+R dua kali selama persiapan tidak boleh memulai dua perekam.
+  let recStarting = false;
   async function startRecording() {
-    if (state.recording) return;
+    if (state.recording || recStarting) return;
+    recStarting = true;
+    try {
+      await startRecordingInner();
+    } finally {
+      recStarting = false;
+    }
+  }
+  async function startRecordingInner() {
     if (!sourcesLoaded || !selectedSource) await loadSources();
     if (!selectedSource) return setStatus('Tidak ada layar yang bisa direkam.', 'error');
     await api.recUseSource({ id: selectedSource, audio: !!S.recSystemAudio });

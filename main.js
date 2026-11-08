@@ -161,7 +161,13 @@ async function captureDisplay(display) {
   const s = display.scaleFactor || 1;
   const thumbnailSize = { width: Math.round(display.size.width * s), height: Math.round(display.size.height * s) };
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize });
-  const src = sources.find((x) => x.display_id === String(display.id)) || (sources.length === 1 ? sources[0] : null);
+  let src = sources.find((x) => x.display_id === String(display.id)) || (sources.length === 1 ? sources[0] : null);
+  if (!src) {
+    // Sebagian PC multi-GPU tidak mengisi display_id: cocokkan menurut urutan layar.
+    const all = screen.getAllDisplays();
+    const idx = all.findIndex((d) => d.id === display.id);
+    if (idx >= 0 && sources.length === all.length) src = sources[idx];
+  }
   if (!src || src.thumbnail.isEmpty()) throw new Error('Layar tidak bisa ditangkap.');
   return src.thumbnail;
 }
@@ -239,7 +245,7 @@ function pickArea(display, thumb) {
 let ocrBusy = false;
 
 async function selectAndRecognize() {
-  if (ocrBusy || overlayWin) return { error: 'Masih memproses, tunggu sebentar.' };
+  if (ocrBusy || overlayWin) return { error: 'Masih memproses, tunggu sebentar.', busy: true };
   ocrBusy = true;
   let hidden = false;
   try {
@@ -287,7 +293,7 @@ async function recognizeLast(opt = {}) {
   if (!lastRegion) return { error: 'NO_REGION' };
   const display = regionDisplay();
   if (!display) return { error: 'Layar untuk area ini tidak ditemukan. Pilih area lagi.' };
-  if (ocrBusy) return { error: 'Masih memproses, tunggu sebentar.' };
+  if (ocrBusy) return { error: 'Masih memproses, tunggu sebentar.', busy: true };
   ocrBusy = true;
   let hidden = false;
   try {
@@ -552,6 +558,7 @@ function registerIpc() {
   ipcMain.handle('rec:begin', (e, { ext }) => {
     const dir = recFolder();
     fs.mkdirSync(dir, { recursive: true });
+    if (recStream) recStream.end(); // jangan sampai dua rekaman menulis ke satu file
     recPath = path.join(dir, `Rekaman ${stamp()}.${ext === 'mp4' ? 'mp4' : 'webm'}`);
     recStream = fs.createWriteStream(recPath);
     return recPath;
@@ -611,6 +618,8 @@ function registerIpc() {
     quitting = true;
     updater.quitAndInstall(true, true);
   });
+  // document.hidden selalu false karena backgroundThrottling: false — tanyakan ke sini.
+  ipcMain.handle('win:visible', () => !!mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized());
   ipcMain.handle('win:hide', () => mainWindow && mainWindow.hide());
   ipcMain.handle('win:show', (e, inactive) => showMain(!!inactive));
   ipcMain.handle('win:minimize', () => mainWindow && mainWindow.minimize());

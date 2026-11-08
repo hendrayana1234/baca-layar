@@ -71,9 +71,11 @@ async function scroll(physPoint, notches, restore = true) {
     }
     return 'native';
   }
-  const x = physPoint ? Math.round(physPoint.x) : -1;
-  const y = physPoint ? Math.round(physPoint.y) : -1;
-  await runScript('win-scroll.ps1', ['-X', x, '-Y', y, '-Notches', notches < 0 ? -n : n, '-Restore', restore ? 1 : 0], 20000);
+  // Satu argumen berawalan "p:" — PowerShell 5.1 salah membaca argumen negatif seperti "-5".
+  const x = physPoint ? Math.round(physPoint.x) : -99999;
+  const y = physPoint ? Math.round(physPoint.y) : -99999;
+  const spec = `p:${x},${y},${notches < 0 ? -n : n},${restore ? 1 : 0}`;
+  await runScript('win-scroll.ps1', ['-Spec', spec], 20000);
   return 'powershell';
 }
 

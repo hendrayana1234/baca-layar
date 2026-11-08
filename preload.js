@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('api', {
   showItem: invoke('shell:showItem'),
   openRecFolder: invoke('shell:openFolder'),
   openExternal: invoke('shell:external'),
+  isWindowVisible: invoke('win:visible'),
   hideWindow: invoke('win:hide'),
   showWindow: invoke('win:show'),
   minimize: invoke('win:minimize'),

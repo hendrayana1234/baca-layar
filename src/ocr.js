@@ -9,32 +9,34 @@ const { runScript, readJsonFile } = require('./winps');
 
 const TESSDATA = path.join(__dirname, '..', 'tessdata');
 
-let worker = null;
-let workerLangs = '';
-let workerPromise = null;
+// Satu worker aktif: { langs, promise }. Ganti bahasa → worker lama dimatikan dulu.
+// Bila pembuatan gagal, cache dikosongkan agar percobaan berikutnya membuat ulang.
+let current = null;
 
-async function getWorker(langs) {
-  if (worker && workerLangs === langs) return worker;
-  if (workerPromise && workerLangs === langs) return workerPromise;
-  if (worker) {
-    try {
-      await worker.terminate();
-    } catch (_) {}
-    worker = null;
-  }
-  workerLangs = langs;
-  const { createWorker } = require('tesseract.js');
-  workerPromise = createWorker(langs.split('+'), 1, {
-    langPath: TESSDATA,
-    cacheMethod: 'none',
-    gzip: true,
-  }).then(async (w) => {
+function getWorker(langs) {
+  if (current && current.langs === langs) return current.promise;
+  const prev = current;
+  const promise = (async () => {
+    if (prev) {
+      try {
+        const old = await prev.promise;
+        await old.terminate();
+      } catch (_) {}
+    }
+    const { createWorker } = require('tesseract.js');
+    const w = await createWorker(langs.split('+'), 1, {
+      langPath: TESSDATA,
+      cacheMethod: 'none',
+      gzip: true,
+    });
     await w.setParameters({ preserve_interword_spaces: '1' });
-    worker = w;
-    workerPromise = null;
     return w;
+  })();
+  current = { langs, promise };
+  promise.catch(() => {
+    if (current && current.promise === promise) current = null;
   });
-  return workerPromise;
+  return promise;
 }
 
 /** Siapkan Tesseract di latar belakang agar baca pertama lebih cepat. */
