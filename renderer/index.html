@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Baca Layar</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-area" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 10h8M8 14h5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-again" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-flow" viewBox="0 0 24 24"><path d="M5 6h10M5 10h7M5 14h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18 9v10m0 0-3-3m3 3 3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.52.85l10.4-6.5a1 1 0 0 0 0-1.7L9.52 4.65A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v15m0 0-6-6m6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V5m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-mouse" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 11v6M14 11v6M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="top">
+  <div class="brand">
+    <img src="../assets/icon.png" alt="">
+    <div>
+      <h1>Baca Layar</h1>
+      <p>Baca teks dari layar mana saja</p>
+    </div>
+  </div>
+  <span id="pill" class="pill">Siap</span>
+</header>
+
+<div id="updateBar" class="updatebar hidden">
+  <span>Versi baru <b id="updVer"></b> sudah diunduh.</span>
+  <button id="btnUpdate" class="btn primary">Pasang &amp; mulai ulang</button>
+</div>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="baca" class="active">Baca</button>
+  <button role="tab" data-tab="gulir">Gulir</button>
+  <button role="tab" data-tab="rekam">Rekam</button>
+  <button role="tab" data-tab="atur">Atur</button>
+</nav>
+
+<main>
+  <!-- ============ BACA ============ -->
+  <section id="tab-baca" class="tab active">
+    <div class="actions">
+      <button id="btnSelect" class="act primary">
+        <svg><use href="#i-area"/></svg>
+        <span class="lbl"><b>Pilih area &amp; baca</b><kbd>Ctrl+Alt+O</kbd></span>
+      </button>
+      <button id="btnReread" class="act">
+        <svg><use href="#i-again"/></svg>
+        <span class="lbl"><b>Baca ulang area</b><kbd>Ctrl+Alt+L</kbd></span>
+      </button>
+      <button id="btnContinuous" class="act flow">
+        <svg><use href="#i-flow"/></svg>
+        <span class="lbl"><b id="contLabel">Baca Terus</b><small>baca → gulir → baca</small><kbd>Ctrl+Alt+B</kbd></span>
+      </button>
+      <button id="btnStopAll" class="act quiet">
+        <svg><use href="#i-stop"/></svg>
+        <span class="lbl"><b>Hentikan</b><kbd>Ctrl+Alt+X</kbd></span>
+      </button>
+    </div>
+
+    <div class="region" id="regionLine">
+      <span id="regionText">Belum ada area. Klik <b>Pilih area</b>, lalu seret kotak di atas teks yang mau dibaca.</span>
+      <button id="btnRegionClear" class="link hidden">lupakan area</button>
+    </div>
+
+    <div class="player">
+      <button id="btnPlay" class="round" title="Bacakan / jeda"><svg><use href="#i-play"/></svg></button>
+      <button id="btnStop" class="round ghost" title="Berhenti"><svg><use href="#i-stop"/></svg></button>
+      <div class="voicebox">
+        <select id="voice" title="Pilih suara"></select>
+        <label class="speed">
+          <span>Kecepatan</span>
+          <input id="rate" type="range" min="0.5" max="2" step="0.1" data-setting="rate">
+          <output id="rateOut">1.0×</output>
+        </label>
+      </div>
+    </div>
+    <div id="speakLine" class="speakline hidden"></div>
+
+    <div id="voiceHint" class="note hidden">
+      Suara Bahasa Indonesia belum terpasang, jadi teks dibacakan dengan logat Inggris.
+      <button class="link" data-open="ms-settings:speech">Pasang suara Indonesia</button>
+      (Windows → Ucapan → Tambahkan suara → Bahasa Indonesia), lalu buka ulang aplikasi.
+    </div>
+
+    <div class="textwrap">
+      <div class="texttools">
+        <label class="check"><input type="checkbox" id="append" data-setting="appendText"> Tambah ke bawah</label>
+        <span class="spacer"></span>
+        <span id="wordCount" class="muted small"></span>
+        <button id="btnCopy" class="tool" title="Salin"><svg><use href="#i-copy"/></svg>Salin</button>
+        <button id="btnSave" class="tool" title="Simpan .txt"><svg><use href="#i-save"/></svg>Simpan</button>
+        <button id="btnClear" class="tool" title="Hapus teks"><svg><use href="#i-trash"/></svg></button>
+      </div>
+      <textarea id="text" spellcheck="false" placeholder="Teks yang terbaca muncul di sini. Bisa diedit dulu sebelum dibacakan.&#10;&#10;Contoh: buka modul PDF atau halaman web, tekan Ctrl+Alt+O, seret kotak di atas tulisannya — aplikasi langsung membacakan."></textarea>
+    </div>
+  </section>
+
+  <!-- ============ GULIR ============ -->
+  <section id="tab-gulir" class="tab">
+    <div class="card">
+      <h3>Jarak gulir per langkah</h3>
+      <div class="stepper">
+        <button class="round sm ghost" data-step="-1">−</button>
+        <input type="number" id="scrollNotches" min="1" max="30" data-setting="scrollNotches">
+        <button class="round sm ghost" data-step="1">+</button>
+        <span class="muted">klik roda mouse</span>
+      </div>
+      <p class="muted small">Dipakai oleh tombol gulir di bawah, hotkey gulir, dan Baca Terus. Satu klik roda di browser ≈ 3 baris.</p>
+      <div class="row">
+        <button id="btnScrollDown" class="btn"><svg><use href="#i-down"/></svg>Gulir ke bawah</button>
+        <button id="btnScrollUp" class="btn ghost"><svg><use href="#i-up"/></svg>Ke atas</button>
+      </div>
+      <p class="muted small">Tanpa membuka aplikasi: arahkan mouse ke halaman, tekan <kbd>Ctrl+Alt+PageDown</kbd> (turun) atau <kbd>Ctrl+Alt+PageUp</kbd> (naik).</p>
+    </div>
+
+    <div class="card">
+      <h3>Gulir otomatis</h3>
+      <p class="muted">Halaman turun pelan-pelan sendiri di posisi mouse — cocok sambil membaca atau merekam layar.</p>
+      <label class="speed wide">
+        <span>Kecepatan</span>
+        <input id="autoSpeed" type="range" min="1" max="10" step="1">
+        <output id="autoSpeedOut"></output>
+      </label>
+      <div class="row">
+        <button id="btnAutoScroll" class="btn primary"><svg><use href="#i-mouse"/></svg><span id="autoLabel">Mulai gulir otomatis</span></button>
+        <kbd>Ctrl+Alt+G</kbd>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Baca Terus</h3>
+      <p class="muted">Aplikasi membaca area terpilih, membacakannya, lalu menggulir halaman sendiri dan lanjut membaca sampai akhir dokumen. Teks yang sudah dibaca tidak diulang.</p>
+      <label class="field">
+        <span>Tunggu setelah gulir</span>
+        <select id="scrollDelayMs" data-setting="scrollDelayMs" data-num>
+          <option value="500">0,5 detik</option>
+          <option value="900">0,9 detik</option>
+          <option value="1500">1,5 detik</option>
+          <option value="2500">2,5 detik (halaman lambat)</option>
+        </select>
+      </label>
+      <div class="tip">Ada kalimat terlewat? <b>Kecilkan</b> jarak gulir. Banyak kalimat diulang? <b>Besarkan</b>. Pilih area hanya kolom teks (tanpa toolbar) agar hasil paling bersih.</div>
+      <div class="row">
+        <button id="btnContinuous2" class="btn flow"><svg><use href="#i-flow"/></svg><span id="contLabel2">Mulai Baca Terus</span></button>
+        <kbd>Ctrl+Alt+B</kbd>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REKAM ============ -->
+  <section id="tab-rekam" class="tab">
+    <div class="card">
+      <div class="cardhead">
+        <h3>Pilih yang direkam</h3>
+        <button id="btnRefreshSrc" class="tool"><svg><use href="#i-again"/></svg>Muat ulang</button>
+      </div>
+      <div id="sources" class="sources"><p class="muted small">Memuat daftar layar…</p></div>
+    </div>
+
+    <div class="card">
+      <div class="opts">
+        <label class="check"><input type="checkbox" data-setting="recSystemAudio"> Suara komputer</label>
+        <label class="check"><input type="checkbox" data-setting="recMic"> Mikrofon</label>
+        <label class="check"><input type="checkbox" data-setting="recCountdown"> Hitung mundur 3 detik</label>
+        <label class="check"><input type="checkbox" data-setting="recHideWindow"> Sembunyikan jendela saat merekam</label>
+        <label class="field"><span>Kualitas</span>
+          <select data-setting="recQuality">
+            <option value="standard">Standar (file lebih kecil)</option>
+            <option value="high">Tinggi</option>
+          </select>
+        </label>
+        <label class="field"><span>Gambar per detik</span>
+          <select data-setting="recFps" data-num>
+            <option value="30">30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="recbar">
+      <button id="btnRec" class="recbtn"><span class="dot"></span><span id="recLabel">Mulai rekam</span></button>
+      <button id="btnRecPause" class="btn ghost" disabled><svg><use href="#i-pause"/></svg><span id="recPauseLabel">Jeda</span></button>
+      <span id="recTime" class="rectime">00:00</span>
+    </div>
+    <p class="muted small center">Hotkey <kbd>Ctrl+Alt+R</kbd> untuk mulai/stop, juga saat jendela tersembunyi.</p>
+
+    <div id="lastRec" class="card saved hidden">
+      <div><span class="muted small">Tersimpan</span><div id="lastRecName" class="fname"></div></div>
+      <div class="row">
+        <button id="btnOpenRec" class="btn"><svg><use href="#i-play"/></svg>Putar</button>
+        <button id="btnShowRec" class="btn ghost"><svg><use href="#i-folder"/></svg>Lihat di folder</button>
+      </div>
+    </div>
+    <p class="muted small">Folder simpan: <span id="recFolder"></span> <button id="btnRecFolder" class="link">ganti…</button></p>
+  </section>
+
+  <!-- ============ ATUR ============ -->
+  <section id="tab-atur" class="tab">
+    <div class="card">
+      <h3>Pengenalan teks</h3>
+      <label class="field"><span>Mesin</span>
+        <select data-setting="ocrEngine">
+          <option value="tesseract">Tesseract (offline, disarankan)</option>
+          <option value="windows">OCR Windows (lebih cepat)</option>
+        </select>
+      </label>
+      <label class="field"><span>Bahasa teks</span>
+        <select data-setting="ocrLang">
+          <option value="ind+eng">Indonesia + Inggris</option>
+          <option value="ind">Indonesia saja</option>
+          <option value="eng">Inggris saja</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" data-setting="cleanWatermark"> Bersihkan watermark tipis (mis. NIM di modul UT)</label>
+      <label class="speed wide">
+        <span>Kekuatan pembersih</span>
+        <input type="range" min="120" max="225" step="5" data-setting="watermarkThreshold" id="wmRange">
+        <output id="wmOut"></output>
+      </label>
+      <p class="muted small">Naikkan bila watermark masih ikut terbaca; turunkan bila huruf tipis/abu-abu hilang.</p>
+      <label class="check"><input type="checkbox" data-setting="tidyText"> Gabungkan baris jadi paragraf</label>
+      <label class="check"><input type="checkbox" data-setting="autoSpeak"> Langsung bacakan setelah area dipilih</label>
+    </div>
+
+    <div class="card">
+      <h3>Suara</h3>
+      <p class="muted">Suara Bahasa Indonesia (Microsoft Andika) gratis dari Windows: Pengaturan → Waktu &amp; bahasa → Ucapan → Tambahkan suara.</p>
+      <div class="row">
+        <button class="btn ghost" data-open="ms-settings:speech">Buka pengaturan suara Windows</button>
+        <button id="btnTestVoice" class="btn ghost"><svg><use href="#i-play"/></svg>Coba suara</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Umum</h3>
+      <label class="check"><input type="checkbox" data-setting="closeToTray"> Tombol tutup = sembunyikan ke tray (hotkey tetap aktif)</label>
+      <label class="check"><input type="checkbox" data-setting="openAtLogin"> Jalankan otomatis saat Windows menyala</label>
+    </div>
+
+    <div class="card">
+      <h3>Hotkey</h3>
+      <table class="keys" id="hotkeys"></table>
+    </div>
+    <p class="muted small center">Baca Layar v<span id="ver"></span></p>
+  </section>
+</main>
+
+<footer id="status" class="status">Siap.</footer>
+<div id="toast" class="toast"></div>
+<div id="countdown" class="countdown hidden"><div class="num"></div><div class="msg"></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>

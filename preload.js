@@ -1,0 +1,53 @@
+'use strict';
+const { contextBridge, ipcRenderer } = require('electron');
+
+const invoke = (ch) => (...args) => ipcRenderer.invoke(ch, ...args);
+const on = (ch) => (cb) => {
+  const fn = (e, payload) => cb(payload);
+  ipcRenderer.on(ch, fn);
+  return () => ipcRenderer.removeListener(ch, fn);
+};
+
+contextBridge.exposeInMainWorld('api', {
+  getSettings: invoke('settings:get'),
+  setSettings: invoke('settings:set'),
+  info: invoke('app:info'),
+  setState: invoke('app:state'),
+
+  ocrSelect: invoke('ocr:select'),
+  ocrLast: invoke('ocr:last'),
+  regionInfo: invoke('region:info'),
+  regionClear: invoke('region:clear'),
+  scroll: invoke('mouse:scroll'),
+  cursorOnOwnWindow: invoke('cursor:onOwnWindow'),
+
+  voices: invoke('tts:voices'),
+  synth: invoke('tts:synth'),
+
+  recSources: invoke('rec:sources'),
+  recUseSource: invoke('rec:useSource'),
+  recBegin: invoke('rec:begin'),
+  recChunk: invoke('rec:chunk'),
+  recEnd: invoke('rec:end'),
+  recChooseFolder: invoke('rec:chooseFolder'),
+
+  saveText: invoke('file:saveText'),
+  copy: invoke('clip:write'),
+  openPath: invoke('shell:open'),
+  showItem: invoke('shell:showItem'),
+  openRecFolder: invoke('shell:openFolder'),
+  openExternal: invoke('shell:external'),
+  hideWindow: invoke('win:hide'),
+  showWindow: invoke('win:show'),
+  minimize: invoke('win:minimize'),
+
+  onHotkey: on('hotkey'),
+  onRegionChanged: on('region:changed'),
+  onProgress: on('ocr:progress'),
+  onUpdateReady: on('update:ready'),
+  installUpdate: invoke('update:install'),
+
+  // jendela pilih area
+  onOverlayInit: on('overlay:init'),
+  overlayDone: (rect) => ipcRenderer.send('overlay:done', rect),
+});

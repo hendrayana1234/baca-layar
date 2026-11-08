@@ -1,0 +1,117 @@
+{
+  "name": "baca-layar",
+  "productName": "Baca Layar",
+  "version": "1.0.0",
+  "description": "Baca teks dari layar (OCR + suara), gulir otomatis, dan rekam layar",
+  "main": "main.js",
+  "author": "Hendrayana",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/run-tests.js",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "copy-tessdata": "node -e \"const fs=require('fs');fs.mkdirSync('tessdata',{recursive:true});for(const l of ['ind','eng'])fs.copyFileSync(require.resolve('@tesseract.js-data/'+l+'/package.json').replace('package.json','4.0.0_best_int/'+l+'.traineddata.gz'),'tessdata/'+l+'.traineddata.gz')\""
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11",
+    "koffi": "^3.3.7",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/ind": "^1.0.0",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "pngjs": "^7.0.0",
+    "resedit": "^3.1.0"
+  },
+  "build": {
+    "appId": "id.hendrayana.bacalayar",
+    "productName": "Baca Layar",
+    "executableName": "BacaLayar",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "src/**/*",
+      "renderer/**/*",
+      "scripts/**/*",
+      "assets/**/*",
+      "tessdata/**/*",
+      "!test/**",
+      "!vendor/**",
+      "!build/**",
+      "!dist/**",
+      "!node_modules/@koromix/**",
+      "!node_modules/koffi/src/**",
+      "!node_modules/koffi/vendor/**",
+      "!node_modules/koffi/doc/**",
+      "!node_modules/koffi/build/**",
+      "!node_modules/@tesseract.js-data/**",
+      "!**/*.{md,markdown,ts,map}",
+      "!**/{test,tests,__tests__,example,examples,docs}/**",
+      "!node_modules/tesseract.js-core/*.wasm.js",
+      "!node_modules/tesseract.js-core/tesseract-core.{js,wasm}",
+      "!node_modules/tesseract.js-core/tesseract-core-simd.{js,wasm}",
+      "!node_modules/tesseract.js-core/tesseract-core-relaxedsimd.{js,wasm}"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/koffi-win32-x64/win32_x64",
+        "to": "koffi/win32_x64"
+      }
+    ],
+    "afterPack": "build/after-pack.js",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Baca Layar",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "uninstallDisplayName": "Baca Layar",
+      "artifactName": "BacaLayar-Setup-${version}.exe",
+      "language": "1057",
+      "installerLanguages": [
+        "id_ID"
+      ]
+    },
+    "electronLanguages": [
+      "en-US",
+      "id"
+    ],
+    "compression": "maximum",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "hendrayana1234",
+        "repo": "baca-layar",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hendrayana1234/baca-layar.git"
+  }
+}

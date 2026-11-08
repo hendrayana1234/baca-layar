@@ -1,0 +1,51 @@
+name: Build & Release
+
+# Installer Windows dibuat otomatis setiap kali versi di package.json naik.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cek versi
+        id: ver
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Rilis v$V sudah ada — tidak ada yang dibuat."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.ver.outputs.exists == 'false'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pasang dependensi
+        if: steps.ver.outputs.exists == 'false'
+        run: npm ci
+
+      - name: Uji
+        if: steps.ver.outputs.exists == 'false'
+        run: npm test
+
+      - name: Build & terbitkan installer
+        if: steps.ver.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win nsis --x64 --publish always

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.log
+# screenshot pribadi untuk uji OCR (berisi NIM & bookmark) — jangan diunggah
+test/fixtures/
