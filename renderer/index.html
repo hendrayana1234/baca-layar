@@ -31,7 +31,10 @@
       <p>Baca teks dari layar mana saja</p>
     </div>
   </div>
-  <span id="pill" class="pill">Siap</span>
+  <div class="topright">
+    <button id="hdrUpdate" class="hdrupd" title="Cek / pasang update"><svg><use href="#i-again"/></svg><span>Update</span></button>
+    <span id="pill" class="pill">Siap</span>
+  </div>
 </header>
 
 <div id="updateBar" class="updatebar hidden">
@@ -214,6 +217,19 @@
 
   <!-- ============ ATUR ============ -->
   <section id="tab-atur" class="tab">
+    <div class="card" id="updateCard">
+      <div class="cardhead">
+        <h3>Update</h3>
+        <span class="muted small">Versi terpasang <b id="ver2"></b></span>
+      </div>
+      <p class="muted small" id="updText">Aplikasi memeriksa versi baru sendiri saat dibuka dan tiap 6 jam, lalu mengunduhnya di latar belakang.</p>
+      <div class="updprog hidden" id="updProg"><i id="updBarFill"></i></div>
+      <div class="row">
+        <button id="btnCheckUpdate" class="btn"><svg><use href="#i-again"/></svg>Cek update</button>
+        <button id="btnInstallUpdate" class="btn primary hidden"><svg><use href="#i-save"/></svg>Pasang &amp; mulai ulang</button>
+      </div>
+    </div>
+
     <div class="card">
       <h3>Pengenalan teks</h3>
       <label class="field"><span>Mesin</span>

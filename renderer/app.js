@@ -861,10 +861,73 @@
     $('#updVer').textContent = v ? 'v' + v : '';
     $('#updateBar').classList.remove('hidden');
   });
-  $('#btnUpdate').addEventListener('click', () => {
+  function installUpdate() {
     if (state.recording) return toast('Hentikan rekaman dulu sebelum memasang update.');
     api.installUpdate();
+  }
+  $('#btnUpdate').addEventListener('click', installUpdate);
+  $('#btnInstallUpdate').addEventListener('click', installUpdate);
+
+  let manualCheck = false;
+  function renderUpdate(s) {
+    s = s || { state: 'idle' };
+    const txt = $('#updText');
+    const btn = $('#btnCheckUpdate');
+    txt.className = 'muted small';
+    $('#updProg').classList.toggle('hidden', s.state !== 'downloading');
+    $('#btnInstallUpdate').classList.toggle('hidden', s.state !== 'ready');
+    btn.disabled = s.state === 'checking' || s.state === 'downloading';
+    btn.classList.toggle('hidden', s.state === 'ready');
+    $('#hdrUpdate').classList.toggle('has', s.state === 'ready');
+    switch (s.state) {
+      case 'checking':
+        txt.textContent = 'Memeriksa versi baru di GitHub…';
+        break;
+      case 'latest':
+        txt.textContent = 'Sudah versi terbaru ✓';
+        txt.className = 'small ok';
+        if (manualCheck) toast('Baca Layar sudah versi terbaru.');
+        manualCheck = false;
+        break;
+      case 'downloading':
+        txt.textContent = `Mengunduh versi ${s.version ? 'v' + s.version : 'baru'}… ${s.percent || 0}%`;
+        $('#updBarFill').style.width = (s.percent || 0) + '%';
+        break;
+      case 'ready':
+        txt.textContent = `Versi v${s.version} sudah diunduh. Klik "Pasang & mulai ulang" — aplikasi tertutup sebentar lalu terbuka lagi.`;
+        txt.className = 'small ready';
+        $('#updVer').textContent = s.version ? 'v' + s.version : '';
+        $('#updateBar').classList.remove('hidden');
+        break;
+      case 'error':
+        txt.textContent = 'Gagal memeriksa update: ' + (s.message || 'tidak diketahui') + '. Cek internet lalu coba lagi.';
+        txt.className = 'small error';
+        manualCheck = false;
+        break;
+      case 'unavailable':
+        txt.textContent = s.message || 'Update otomatis hanya berjalan di aplikasi yang dipasang lewat installer.';
+        manualCheck = false;
+        break;
+      default:
+        txt.textContent = 'Aplikasi memeriksa versi baru sendiri saat dibuka dan tiap 6 jam, lalu mengunduhnya di latar belakang.';
+    }
+  }
+  api.onUpdateStatus(renderUpdate);
+  function showUpdateCard() {
+    $$('.tabs button').find((b) => b.dataset.tab === 'atur').click();
+    $('#updateCard').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  api.onUpdateShow(showUpdateCard);
+  $('#btnCheckUpdate').addEventListener('click', async () => {
+    manualCheck = true;
+    renderUpdate({ state: 'checking' });
+    renderUpdate(await api.checkUpdate());
   });
+  $('#hdrUpdate').addEventListener('click', () => {
+    showUpdateCard();
+    if (!$('#hdrUpdate').classList.contains('has')) $('#btnCheckUpdate').click();
+  });
+  api.updateStatus().then(renderUpdate);
 
   // ---------- mulai ----------
   const HOTKEY_LABELS = {
@@ -886,6 +949,7 @@
     $('#autoSpeed').value = msToSpeed(S.autoScrollIntervalMs);
     syncAutoSpeed();
     $('#ver').textContent = info.version;
+    $('#ver2').textContent = 'v' + info.version;
     $('#recFolder').textContent = info.recFolder;
     $('#hotkeys').innerHTML = Object.entries(info.hotkeys)
       .map(([k, v]) => `<tr><td>${HOTKEY_LABELS[k] || k}${info.hotkeyStatus[k] === false ? '<span class="bad">dipakai aplikasi lain</span>' : ''}</td><td><kbd>${v}</kbd></td></tr>`)

@@ -47,6 +47,10 @@ contextBridge.exposeInMainWorld('api', {
   onProgress: on('ocr:progress'),
   onUpdateReady: on('update:ready'),
   installUpdate: invoke('update:install'),
+  checkUpdate: invoke('update:check'),
+  updateStatus: invoke('update:getStatus'),
+  onUpdateStatus: on('update:status'),
+  onUpdateShow: on('update:show'),
 
   // halaman di dalam aplikasi
   pageOpen: invoke('page:open'),

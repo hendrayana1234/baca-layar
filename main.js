@@ -755,6 +755,23 @@ function buildTrayMenu() {
     { label: 'Hentikan semua\t' + HOTKEYS.stopAll, click: () => send('hotkey', 'stopAll') },
     { type: 'separator' },
     { label: 'Buka halaman di aplikasi\t' + HOTKEYS.page, click: () => openPage() },
+    updateStatus.state === 'ready'
+      ? {
+          label: `Pasang update v${updateStatus.version} & mulai ulang`,
+          click: () => {
+            if (!updater) return;
+            quitting = true;
+            updater.quitAndInstall(true, true);
+          },
+        }
+      : {
+          label: 'Cek update',
+          click: () => {
+            showMain();
+            send('update:show');
+            checkUpdate();
+          },
+        },
     { label: 'Tampilkan Baca Layar', click: () => showMain() },
     {
       label: 'Keluar',
@@ -994,6 +1011,8 @@ function registerIpc() {
   ipcMain.handle('shell:external', (e, url) => {
     if (/^(https?:|ms-settings:)/.test(url)) return shell.openExternal(url);
   });
+  ipcMain.handle('update:check', () => checkUpdate());
+  ipcMain.handle('update:getStatus', () => (updater ? updateStatus : { state: 'unavailable' }));
   ipcMain.handle('update:install', () => {
     if (!updater) return;
     quitting = true;
@@ -1017,11 +1036,42 @@ function setupUpdater() {
   }
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
-  updater.on('update-downloaded', (info) => send('update:ready', info && info.version));
-  updater.on('error', (e) => mouse.logError('update: ' + (e && e.message)));
-  const check = () => updater.checkForUpdates().catch(() => {});
-  setTimeout(check, 8000);
-  setInterval(check, 6 * 3600 * 1000);
+  updater.on('checking-for-update', () => setUpdateStatus({ state: 'checking' }));
+  updater.on('update-not-available', () => setUpdateStatus({ state: 'latest', checkedAt: Date.now() }));
+  updater.on('update-available', (info) => setUpdateStatus({ state: 'downloading', version: info && info.version, percent: 0 }));
+  updater.on('download-progress', (p) =>
+    setUpdateStatus({ ...updateStatus, state: 'downloading', percent: Math.round((p && p.percent) || 0) })
+  );
+  updater.on('update-downloaded', (info) => {
+    setUpdateStatus({ state: 'ready', version: info && info.version });
+    send('update:ready', info && info.version);
+  });
+  updater.on('error', (e) => {
+    mouse.logError('update: ' + (e && e.message));
+    setUpdateStatus({ state: 'error', message: String((e && e.message) || e).split('\n')[0] });
+  });
+  setTimeout(checkUpdate, 8000);
+  setInterval(checkUpdate, 6 * 3600 * 1000);
+}
+
+let updateStatus = { state: 'idle' };
+function setUpdateStatus(s) {
+  updateStatus = s;
+  send('update:status', s);
+  buildTrayMenu();
+}
+/** Cek update sekarang (dipanggil otomatis dan dari tombol "Cek update"). */
+function checkUpdate() {
+  if (!updater) {
+    setUpdateStatus({ state: 'unavailable', message: 'Update otomatis hanya berjalan di aplikasi yang dipasang lewat installer.' });
+    return updateStatus;
+  }
+  if (updateStatus.state === 'ready' || updateStatus.state === 'downloading' || updateStatus.state === 'checking') {
+    send('update:status', updateStatus);
+    return updateStatus;
+  }
+  updater.checkForUpdates().catch((e) => setUpdateStatus({ state: 'error', message: String((e && e.message) || e).split('\n')[0] }));
+  return updateStatus;
 }
 
 // ---------------- Mulai ----------------

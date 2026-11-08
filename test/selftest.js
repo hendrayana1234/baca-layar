@@ -61,6 +61,14 @@ module.exports = function selftest(win, { ocr, nativeImage, settings, app, page 
         await sleep(tab === 'rekam' ? 2500 : 400);
         await shot(win, `tab-${tab}.png`);
       }
+      await js(`window.dispatchEvent(new Event('x'))`);
+      win.webContents.send('update:status', { state: 'downloading', version: '1.2.0', percent: 42 });
+      await js(`document.querySelector('[data-tab=atur]').click()`);
+      await sleep(300);
+      await shot(win, 'update-downloading.png');
+      win.webContents.send('update:status', { state: 'ready', version: '1.2.0' });
+      await sleep(300);
+      await shot(win, 'update-ready.png');
       await js(`document.querySelector('[data-tab=baca]').click(); document.querySelector('#btnContinuous').classList.add('on'); document.querySelector('#contLabel').textContent='Hentikan Baca Terus';`);
       await sleep(200);
 

@@ -15,7 +15,7 @@ Aplikasi Windows untuk **membaca teks langsung dari layar** — modul PDF, halam
 - **Suara Windows** termasuk suara Bahasa Indonesia *Microsoft Andika*, kecepatan bisa diatur, bisa jeda/lanjut.
 - **Rekam layar** (`Ctrl+Alt+R`) — seluruh layar atau satu jendela, dengan suara komputer dan/atau mikrofon, disimpan sebagai MP4 di `Videos\Baca Layar`.
 - Berjalan di **tray**; semua hotkey tetap aktif saat jendela tersembunyi. `Ctrl+Alt+X` menghentikan suara, Baca Terus, dan gulir.
-- **Update otomatis** dari GitHub Releases.
+- **Update otomatis** dari GitHub Releases — diperiksa saat aplikasi dibuka dan tiap 6 jam. Bisa juga manual: tombol **Update** di pojok kanan atas, tab **Atur → Update**, atau menu tray **Cek update**.
 
 ## Pasang
 
