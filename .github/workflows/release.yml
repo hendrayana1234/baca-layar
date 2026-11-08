@@ -66,3 +66,47 @@ jobs:
             gh release create "v$V" "${FILES[@]}" --target "$GITHUB_SHA" --title "Baca Layar $V" \
               --notes "Unduh **BacaLayar-Setup-$V.exe** di bawah lalu jalankan. Bila muncul SmartScreen: *Info selengkapnya → Tetap jalankan*. Aplikasi yang sudah terpasang akan memperbarui diri otomatis."
           fi
+
+  linux:
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cek versi
+        id: ver
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" --json assets --jq '.assets[].name' 2>/dev/null | grep -q 'linux-x64.AppImage'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v5
+        if: steps.ver.outputs.skip == 'false'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pasang dependensi
+        if: steps.ver.outputs.skip == 'false'
+        run: npm ci
+
+      - name: Build AppImage & deb
+        if: steps.ver.outputs.skip == 'false'
+        run: npm run dist:linux
+
+      - name: Unggah ke rilis
+        if: steps.ver.outputs.skip == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          until gh release view "v$V" >/dev/null 2>&1; do sleep 15; done
+          gh release upload "v$V" dist-linux/BacaLayar-$V-linux-x64.AppImage dist-linux/BacaLayar-$V-linux-x64.deb --clobber
